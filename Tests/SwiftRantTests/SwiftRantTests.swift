@@ -1,8 +1,10 @@
 import XCTest
 @testable import SwiftRant
+import SwiftKeychainWrapper
 
 final class SwiftRantTests: XCTestCase {
     func testLogin() throws {
+        let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
         // This is an example of a functional test case.
         // Use XCTAssert and related functions to verify your tests produce the correct
         // results.
@@ -10,18 +12,36 @@ final class SwiftRantTests: XCTestCase {
         
         let semaphore = DispatchSemaphore(value: 0)
         
-        SwiftRant.logIn(username: "OmerFlame", password: "ntbf782m", shouldUseUserDefaults: true) { error, token in
+        SwiftRant.shared.logIn(username: "OmerFlame", password: "password-here") { error, token in
             XCTAssertNotNil(token)
             XCTAssertNil(error)
             
-            let storedToken: UserCredentials? = UserDefaults.standard.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
             
             XCTAssertNotNil(storedToken)
             
-            XCTAssertEqual(UserDefaults.standard.string(forKey: "DRUsername")!, "OmerFlame")
-            XCTAssertEqual(UserDefaults.standard.string(forKey: "DRPassword")!, "ntbf782m")
+            let query: [String:Any] = [kSecClass as String: kSecClassGenericPassword,
+                                       kSecMatchLimit as String: kSecMatchLimitOne,
+                                       kSecReturnAttributes as String: true,
+                                       kSecReturnData as String: true,
+                                       kSecAttrLabel as String: "SwiftRant-Attached Account" as CFString
+            ]
+            
+            var item: CFTypeRef?
+            var status = SecItemCopyMatching(query as CFDictionary, &item)
+            
+            let existingItem = item as? [String:Any]
+            let passwordData = existingItem?[kSecValueData as String] as? Data
+            let password = String(data: passwordData ?? Data(), encoding: .utf8)
+            let account = existingItem?[kSecAttrAccount as String] as? String
+            
+            XCTAssertEqual(account, Optional("OmerFlame"))
+            XCTAssertEqual(password, Optional("password-here"))
             
             UserDefaults.resetStandardUserDefaults()
+            keychainWrapper.removeAllKeys()
+            
+            status = SecItemDelete(query as CFDictionary)
             
             semaphore.signal()
         }
@@ -34,10 +54,10 @@ final class SwiftRantTests: XCTestCase {
     func testRantFeed() throws {
         let semaphore = DispatchSemaphore(value: 0)
         
-        SwiftRant.logIn(username: "OmerFlame", password: "ntbf782m", shouldUseUserDefaults: true, completionHandler: { error, _ in
+        SwiftRant.shared.logIn(username: "OmerFlame", password: "password-here", completionHandler: { error, _ in
             XCTAssertNil(error)
             
-            SwiftRant.getRantFeed(shouldUseUserDefaults: true, token: nil, skip: 0, prevSet: nil, completionHandler: { error, rantFeed in
+            SwiftRant.shared.getRantFeed(token: nil, skip: 0, prevSet: nil, completionHandler: { error, rantFeed in
                 print("BREAKPOINT HERE")
                 
                 semaphore.signal()
