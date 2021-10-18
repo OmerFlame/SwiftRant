@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct UserCredentials: Codable {
+public struct UserCredentials: Codable, Equatable {
     public struct AuthToken: Codable {
         public let tokenID: Int
         public let tokenKey: String
@@ -56,5 +56,12 @@ public struct UserCredentials: Codable {
         var values = encoder.container(keyedBy: CodingKeys.self)
         
         try values.encode(authToken, forKey: .authToken)
+    }
+    
+    public static func == (lhs: UserCredentials, rhs: UserCredentials) -> Bool {
+        return lhs.authToken.userID == rhs.authToken.userID &&
+            lhs.authToken.tokenID == rhs.authToken.tokenID &&
+            lhs.authToken.tokenKey == rhs.authToken.tokenKey &&
+            lhs.authToken.expireTime == rhs.authToken.expireTime
     }
 }
