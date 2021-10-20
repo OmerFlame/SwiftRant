@@ -1,8 +1,53 @@
 import XCTest
 @testable import SwiftRant
 import SwiftKeychainWrapper
+#if canImport(Darwin)
+import Darwin
+#else
+import Glibc
+#endif
 
 final class SwiftRantTests: XCTestCase {
+    /*func withStdinReadingString(_ string: String, _ body: () throws -> Void) rethrows {
+        let oldStdin = dup(STDIN_FILENO)
+        
+        let pipe = Pipe()
+        
+        dup2(pipe.fileHandleForReading.fileDescriptor, STDIN_FILENO)
+        
+        pipe.fileHandleForWriting.write(Data(string.utf8))
+        
+        try! pipe.fileHandleForWriting.close()
+        
+        defer {
+            dup2(oldStdin, STDIN_FILENO)
+            
+            close(oldStdin)
+            
+            try! pipe.fileHandleForReading.close()
+        }
+        
+        try body()
+    }*/
+    
+    func withReadLine(_ body: () -> Void) {
+        let oldStdin = dup(STDIN_FILENO)
+        let ttyFD = open("/dev/tty", O_RDONLY)
+        if ttyFD == -1 {
+            fatalError("withReadLine: couldn't read line")
+        }
+        
+        dup2(ttyFD, STDIN_FILENO)
+        
+        defer {
+            dup2(oldStdin, STDIN_FILENO)
+            
+            close(oldStdin)
+        }
+        
+        body()
+    }
+    
     func testLogin() throws {
         let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
         // This is an example of a functional test case.
@@ -166,6 +211,43 @@ final class SwiftRantTests: XCTestCase {
                 
                 print("BREAKPOINT")
                 
+                semaphore.signal()
+            }
+        }
+        
+        semaphore.wait()
+        
+        let query: [String:Any] = [kSecClass as String: kSecClassGenericPassword,
+                                   kSecMatchLimit as String: kSecMatchLimitOne,
+                                   kSecReturnAttributes as String: true,
+                                   kSecReturnData as String: true,
+                                   kSecAttrLabel as String: "SwiftRant-Attached Account" as CFString
+        ]
+        
+        keychainWrapper.removeAllKeys()
+        UserDefaults.resetStandardUserDefaults()
+        SecItemDelete(query as CFDictionary)
+    }
+    
+    func testComment() throws {
+        let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
+        
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        print("Print your real username: ", terminator: "")
+        let username = readLine()
+        
+        print("Print your real password: ", terminator: "")
+        let password = readLine()
+        
+        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
+            XCTAssertNil(error)
+            
+            SwiftRant.shared.getCommentFromID(4813564, token: nil) { error, comment in
+                XCTAssertNil(error)
+                XCTAssertNotNil(comment)
+                
+                print("BREAKPOINT HERE")
                 semaphore.signal()
             }
         }

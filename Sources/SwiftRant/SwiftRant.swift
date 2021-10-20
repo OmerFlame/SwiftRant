@@ -1,6 +1,21 @@
 import Foundation
 import SwiftKeychainWrapper
 
+/// Holds the raw devRant server response for getting a rant.
+/// This is essential because the rant and its comments are distributed across 2 different properties in the returned JSON object.
+fileprivate struct RantResponse: Decodable {
+    
+    /// The rant itself.
+    public var rant: Rant
+    
+    /// The comments listed under the rant.
+    public let comments: [Comment]
+}
+
+fileprivate struct CommentResponse: Decodable {
+    public let comment: Comment
+}
+
 public class SwiftRant {
     
     /// Initializes the SwiftRant library.
@@ -415,7 +430,7 @@ public class SwiftRant {
             if let data = data {
                 let decoder = JSONDecoder()
                 
-                let rantResponse = try? decoder.decode(Rant.RantResponse.self, from: data)
+                let rantResponse = try? decoder.decode(RantResponse.self, from: data)
                 
                 if rantResponse == nil {
                     let jsonObject = try? JSONSerialization.jsonObject(with: data, options: [])
@@ -436,6 +451,74 @@ public class SwiftRant {
                     return
                 }
             }
+        }.resume()
+    }
+    
+    func getCommentFromID(_ id: Int, token: UserCredentials?, completionHandler: ((String?, Comment?) -> Void)?) {
+        if !shouldUseKeychainAndUserDefaults {
+            guard token != nil else {
+                fatalError("No token was specified!")
+            }
+        } else {
+            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            
+            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+                let loginSemaphore = DispatchSemaphore(value: 0)
+                
+                var errorMessage: String?
+                
+                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
+                    if error != nil {
+                        errorMessage = error
+                        loginSemaphore.signal()
+                        return
+                    }
+                    
+                    loginSemaphore.signal()
+                }
+                
+                loginSemaphore.wait()
+                
+                if errorMessage != nil {
+                    completionHandler?(errorMessage, nil)
+                    return
+                }
+            }
+        }
+        
+        let resourceURL = URL(string: baseURL + "/comments/\(id)?app=3&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+        
+        var request = URLRequest(url: resourceURL)
+        request.httpMethod = "GET"
+        request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        
+        let session = URLSession(configuration: .default)
+        
+        session.dataTask(with: request) { data, response, error in
+            if let data = data {
+                let decoder = JSONDecoder()
+                
+                let comment = try? decoder.decode(CommentResponse.self, from: data)
+                
+                if comment == nil {
+                    let jsonObject = try? JSONSerialization.jsonObject(with: data, options: [])
+                    
+                    if let jsonObject = jsonObject {
+                        if let jObject = jsonObject as? [String:Any] {
+                            if let error = jObject["error"] as? String {
+                                completionHandler?(error, nil)
+                                return
+                            }
+                        }
+                    }
+                } else {
+                    completionHandler?(nil, comment?.comment)
+                    return
+                }
+            }
+            
+            completionHandler?("An unknown error has occurred.", nil)
+            return
         }.resume()
     }
 }

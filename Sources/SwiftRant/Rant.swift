@@ -122,17 +122,6 @@ public struct Rant: Decodable, Identifiable {
             avatarImage = try? values.decode(String.self, forKey: .avatarImage)
         }
     }
-
-    /// Holds the raw devRant server response for getting a rant.
-    /// This is essential because the rant and its comments are distributed across 2 different properties in the returned JSON object.
-    public struct RantResponse: Decodable {
-        
-        /// The rant itself.
-        public var rant: Rant
-        
-        /// The comments listed under the rant.
-        public let comments: [Comment]
-    }
     
     public let uuid = UUID()
     
