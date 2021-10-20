@@ -459,7 +459,7 @@ public class SwiftRant {
     /// - parameter id: The ID of the comment to fetch.
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
     /// - parameter completionHandler: A function that will run after the fetch was completed. If the fetch was successful, the `String?` parameter of the function will contain `nil` and the ``Comment`` parameter of the function will contain the fetched comment. If the fetch was unsuccessful, the `String?` parameter will contain an error message, and the ``Comment`` parameter will contain `nil`.
-    func getCommentFromID(_ id: Int, token: UserCredentials?, completionHandler: ((String?, Comment?) -> Void)?) {
+    public func getCommentFromID(_ id: Int, token: UserCredentials?, completionHandler: ((String?, Comment?) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
                 fatalError("No token was specified!")
