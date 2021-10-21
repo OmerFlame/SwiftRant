@@ -9,7 +9,7 @@ fileprivate struct RantResponse: Decodable {
     public var rant: Rant
     
     /// The comments listed under the rant.
-    public let comments: [Comment]
+    public let comments: [Comment]?
 }
 
 fileprivate struct CommentResponse: Decodable {
@@ -84,6 +84,8 @@ public class SwiftRant {
         let credentials: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
         return credentials
     }
+    
+    // MARK: - Data fetchers
     
     /// Returns an auth token if the username and password are both correct.
     ///
@@ -520,6 +522,135 @@ public class SwiftRant {
                     completionHandler?(nil, comment?.comment)
                     return
                 }
+            }
+            
+            completionHandler?("An unknown error has occurred.", nil)
+            return
+        }.resume()
+    }
+    
+    // VERY EARLY PROTOTYPE TO GET THE USER'S SUBSCRIBED FEED.
+    // lastEndCursor is for infinite scroll/pagination.
+    // struct coming soon.
+    public func getSubscribedFeed(_ token: UserCredentials?, lastEndCursor: String?) {
+        if !shouldUseKeychainAndUserDefaults {
+            guard token != nil else {
+                fatalError("No token was specified!")
+            }
+        } else {
+            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            
+            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+                let loginSemaphore = DispatchSemaphore(value: 0)
+                
+                var errorMessage: String?
+                
+                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
+                    if error != nil {
+                        errorMessage = error
+                        loginSemaphore.signal()
+                        return
+                    }
+                    
+                    loginSemaphore.signal()
+                }
+                
+                loginSemaphore.wait()
+                
+                if errorMessage != nil {
+                    // TODO: CREATE A COMPLETION HANDLER!
+                    //completionHandler?(errorMessage, nil)
+                    return
+                }
+            }
+        }
+        
+        let resourceURL = URL(string: baseURL + "/api/me/subscribed-feed?app=3&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+        
+        var request = URLRequest(url: resourceURL)
+        
+        request.httpMethod = "GET"
+        request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        
+        let session = URLSession(configuration: .default)
+        
+        // TODO: WRITE THE REQUEST!
+    }
+    
+    // MARK: - Data Senders
+    
+    /// Vote on a rant.
+    ///
+    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    /// - parameter rantID: The ID of the rant to vote on.
+    /// - parameter vote: The vote state. 1 = upvote, 0 = neutral, -1 = downvote.
+    /// - parameter completionHandler: A function that will run after the request was completed. If the request was successful, the `String` parameter of the function will contain `nil`, and the ``Rant`` parameter of the function will hold the target rant with updated information. If the request was unsuccessful, the `String?` parameter will contain an error message, and the ``Rant`` will contain `nil`.
+    public func voteOnRant(_ token: UserCredentials?, rantID id: Int, vote: Int, completionHandler: ((String?, Rant?) -> Void)?) {
+        if !shouldUseKeychainAndUserDefaults {
+            guard token != nil else {
+                fatalError("No token was specified!")
+            }
+        } else {
+            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            
+            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+                let loginSemaphore = DispatchSemaphore(value: 0)
+                
+                var errorMessage: String?
+                
+                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
+                    if error != nil {
+                        errorMessage = error
+                        loginSemaphore.signal()
+                        return
+                    }
+                    
+                    loginSemaphore.signal()
+                }
+                
+                loginSemaphore.wait()
+                
+                if errorMessage != nil {
+                    completionHandler?(errorMessage, nil)
+                    return
+                }
+            }
+        }
+        
+        let resourceURL = URL(string: baseURL + "/devrant/rants/\(id)/vote".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+        
+        var request = URLRequest(url: resourceURL)
+        
+        request.httpMethod = "POST"
+        request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.httpBody = "app=3&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)&vote=\(vote)".data(using: .utf8)
+        
+        let session = URLSession(configuration: .default)
+        
+        session.dataTask(with: request) { data, response, error in
+            if let data = data {
+                let decoder = JSONDecoder()
+                
+                let updatedRantInfo = try? decoder.decode(RantResponse.self, from: data)
+                
+                if updatedRantInfo == nil {
+                    let jsonObject = try? JSONSerialization.jsonObject(with: data, options: [])
+                    
+                    if let jsonObject = jsonObject {
+                        if let jObject = jsonObject as? [String:Any] {
+                            if let error = jObject["error"] as? String {
+                                completionHandler?(error, nil)
+                                return
+                            }
+                        }
+                    }
+                } else {
+                    completionHandler?(nil, updatedRantInfo?.rant)
+                    return
+                }
+                
+                completionHandler?("An unknown error has occurred.", nil)
+                return
             }
             
             completionHandler?("An unknown error has occurred.", nil)

@@ -265,4 +265,42 @@ final class SwiftRantTests: XCTestCase {
         UserDefaults.resetStandardUserDefaults()
         SecItemDelete(query as CFDictionary)
     }
+    
+    func testVoteOnRant() throws {
+        let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
+        
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        print("Print your real username: ", terminator: "")
+        let username = readLine()
+        
+        print("Print your real password: ", terminator: "")
+        let password = readLine()
+        
+        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
+            XCTAssertNil(error)
+            
+            SwiftRant.shared.voteOnRant(nil, rantID: 4811624, vote: 0) { error, updatedRant in
+                XCTAssertNil(error)
+                XCTAssertNotNil(updatedRant)
+                
+                print("BREAKPOINT HERE")
+                
+                semaphore.signal()
+            }
+        }
+        
+        semaphore.wait()
+        
+        let query: [String:Any] = [kSecClass as String: kSecClassGenericPassword,
+                                   kSecMatchLimit as String: kSecMatchLimitOne,
+                                   kSecReturnAttributes as String: true,
+                                   kSecReturnData as String: true,
+                                   kSecAttrLabel as String: "SwiftRant-Attached Account" as CFString
+        ]
+        
+        keychainWrapper.removeAllKeys()
+        UserDefaults.resetStandardUserDefaults()
+        SecItemDelete(query as CFDictionary)
+    }
 }
