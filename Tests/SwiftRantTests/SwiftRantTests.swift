@@ -156,7 +156,7 @@ final class SwiftRantTests: XCTestCase {
         SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
             XCTAssertNil(error)
             
-            SwiftRant.shared.getRantFromID(token: nil, id: 4806571, lastCommentID: 4806576) { error, rant, comments in
+            SwiftRant.shared.getRantFromID(token: nil, id: 4754397, lastCommentID: nil) { error, rant, comments in
                 XCTAssertNil(error)
                 XCTAssertNotNil(rant)
                 XCTAssertNotNil(comments)
@@ -413,5 +413,23 @@ final class SwiftRantTests: XCTestCase {
         keychainWrapper.removeAllKeys()
         UserDefaults.resetStandardUserDefaults()
         SecItemDelete(query as CFDictionary)
+    }
+    
+    func testPostRant() throws {
+        let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
+        
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        print("Print your real username: ", terminator: "")
+        let username = readLine()
+        
+        print("Print your real password: ", terminator: "")
+        let password = readLine()
+        
+        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
+            XCTAssertNil(error)
+            
+            
+        }
     }
 }

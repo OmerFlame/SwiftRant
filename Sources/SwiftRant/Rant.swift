@@ -286,4 +286,28 @@ public struct Rant: Decodable, Identifiable {
             }
         }
     }
+    
+    /// An enumeration that represents the types of posts that exist.
+    public enum RantType: Int {
+        /// Represents a rant post type.
+        case rant = 1
+        
+        /// Represents a collab post type.
+        case collab = 2
+        
+        /// Represents a meme post type.
+        case meme = 3
+        
+        /// Represents a question post type.
+        case question = 4
+        
+        /// Represents a devRant-related post type.
+        case devRant = 5
+        
+        /// Represents a random topic post type.
+        case random = 6
+        
+        /// Represents an undefined post type (not available anymore in the official client).
+        case undefined = 7
+    }
 }
