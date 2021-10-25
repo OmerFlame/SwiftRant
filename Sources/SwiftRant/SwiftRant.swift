@@ -13,7 +13,11 @@ fileprivate struct RantResponse: Decodable {
 }
 
 fileprivate struct CommentResponse: Decodable {
-    public let comment: Comment
+    public let comment: Comment?
+}
+
+fileprivate struct ProfileResponse: Decodable {
+    let profile: Profile?
 }
 
 public class SwiftRant {
@@ -202,7 +206,7 @@ public class SwiftRant {
     /// - parameter token: The user's token. set to `nil`if the SwiftRant instance was configured to use the Keychain and User Defaults.
     /// - parameter skip: How many rants to skip before loading. Used for pagination/infinite scroll.
     /// - parameter prevSet: The ``RantFeed/set`` you got in the last fetch. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults, the SwiftRant instance will get the set from the last fetch from User Defaults.
-    /// - parameter completionHandler: A function that will run after the fetch was completed. If the fetch is successful, the ``RantFeed`` parameter will hold the actual auth token info, while the `String` is `nil`. If the fetch is unsuccessful, then the `String` will hold an error message, while the ``RantFeed`` will be `nil`.
+    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch is successful, the ``RantFeed`` parameter will hold the actual auth token info, while the `String` is `nil`. If the fetch is unsuccessful, then the `String` will hold an error message, while the ``RantFeed`` will be `nil`.
     public func getRantFeed(token: UserCredentials?, skip: Int, prevSet: String?, completionHandler: @escaping ((String?, RantFeed?) -> Void)) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
@@ -305,7 +309,7 @@ public class SwiftRant {
     /// - parameter lastCheckTime: The last Unix Timestamp at which the notifications were last checked at. Set to `nil` is the SwiftRant instance was configured to use Keychain and User Defaults, or if you set `shouldGetNewNotifs` to `false`.
     /// - parameter shouldGetNewNotifs: Whether or not the function should retrieve the latest notifications since the Unix Timestamp stored in User Defaults or `lastCheckTime`. If set to `false` and the SwiftRant instance was configured to use the Keychain and User Defaults, set `lastCheckTime` to `nil`. If set to `true` and the SwiftRant instance was NOT configured to use the Keychain and User Defaults, set `lastCheckTime` to the last Unix Timestamp at which the notifications were fetched last time.
     /// - parameter category: The category of notifications that the function should return.
-    /// - parameter completionHandler: A function that will run after the fetch was completed. If the fetch was successful, the ``Notifications`` parameter will hold the actual notification info, while the `String` is `nil`. If the fetch was unsuccessful, then the `String` will hold an error message, while the ``Notifications`` will be `nil`.
+    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch was successful, the ``Notifications`` parameter will hold the actual notification info, while the `String` is `nil`. If the fetch was unsuccessful, then the `String` will hold an error message, while the ``Notifications`` will be `nil`.
     public func getNotificationFeed(token: UserCredentials?, lastCheckTime: Int?, shouldGetNewNotifs: Bool, category: Notifications.Categories, completionHandler: @escaping ((String?, Notifications?) -> Void)) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
@@ -385,7 +389,7 @@ public class SwiftRant {
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
     /// - parameter id: The ID of the rant to fetch.
     /// - parameter lastCommentID: If set to a valid comment ID that exists in the rant's comments, the function will get all the comments that were posted after the comment with the given ID.
-    /// - parameter completionHandler: A function that will run after the fetch was completed. If the fetch was successful, the ``Rant`` parameter will hold the actual rant info, the ``Comment`` array will hold all the comments attached to the ``Rant`` and the `String` will be `nil`. If the fetch was unsuccessful, then the `String` will hold an error message, and the ``Rant`` and ``Comment`` will both be `nil`.
+    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch was successful, the ``Rant`` parameter will hold the actual rant info, the ``Comment`` array will hold all the comments attached to the ``Rant`` and the `String` will be `nil`. If the fetch was unsuccessful, then the `String` will hold an error message, and the ``Rant`` and ``Comment`` will both be `nil`.
     public func getRantFromID(token: UserCredentials?, id: Int, lastCommentID: Int?, completionHandler: ((String?, Rant?, [Comment]?) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
@@ -460,7 +464,7 @@ public class SwiftRant {
     ///
     /// - parameter id: The ID of the comment to fetch.
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter completionHandler: A function that will run after the fetch was completed. If the fetch was successful, the `String?` parameter of the function will contain `nil` and the ``Comment`` parameter of the function will contain the fetched comment. If the fetch was unsuccessful, the `String?` parameter will contain an error message, and the ``Comment`` parameter will contain `nil`.
+    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch was successful, the `String?` parameter of the function will contain `nil` and the ``Comment`` parameter of the function will contain the fetched comment. If the fetch was unsuccessful, the `String?` parameter will contain an error message, and the ``Comment`` parameter will contain `nil`.
     public func getCommentFromID(_ id: Int, token: UserCredentials?, completionHandler: ((String?, Comment?) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
@@ -575,6 +579,85 @@ public class SwiftRant {
         let session = URLSession(configuration: .default)
         
         // TODO: WRITE THE REQUEST!
+        fatalError("Not implemented yet!")
+    }
+    
+    /// Get a user's profile data.
+    ///
+    /// - parameter id: The ID of the user whose data will be fetched.
+    /// - parameter userContentType: The type of content created by the user to be fetched.
+    /// - parameter skip: The amount of content to be skipped on. Useful for pagination/infinite scroll.
+    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch was successful, the `String?` parameter of the function will contain `nil`, and the ``Profile`` parameter of the function will hold the fetched profile information. If the fetch was unsuccessful, the `String?` parameter of the function will contain an error message, and the ``Profile`` parameter of the function will contain `nil`.
+    public func getProfileFromID(_ id: Int, token: UserCredentials?, userContentType: Profile.ProfileContentTypes, skip: Int, completionHandler: ((String?, Profile?) -> Void)?) {
+        if !shouldUseKeychainAndUserDefaults {
+            guard token != nil else {
+                fatalError("No token was specified!")
+            }
+        } else {
+            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            
+            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+                let loginSemaphore = DispatchSemaphore(value: 0)
+                
+                var errorMessage: String?
+                
+                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
+                    if error != nil {
+                        errorMessage = error
+                        loginSemaphore.signal()
+                        return
+                    }
+                    
+                    loginSemaphore.signal()
+                }
+                
+                loginSemaphore.wait()
+                
+                if errorMessage != nil {
+                    completionHandler?(errorMessage, nil)
+                    return
+                }
+            }
+        }
+        
+        let resourceURL = URL(string: baseURL + "/users/\(id)?app=3&skip=\(skip)&content=\(userContentType.rawValue)&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+        
+        var request = URLRequest(url: resourceURL)
+        
+        request.httpMethod = "GET"
+        request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        
+        let session = URLSession(configuration: .default)
+        
+        session.dataTask(with: request) { data, response, error in
+            if let data = data {
+                let decoder = JSONDecoder()
+                
+                let profileResponse = try? decoder.decode(ProfileResponse.self, from: data)
+                
+                if profileResponse == nil {
+                    let jsonObject = try? JSONSerialization.jsonObject(with: data, options: [])
+                    
+                    if let jsonObject = jsonObject {
+                        if let jObject = jsonObject as? [String:Any] {
+                            if let error = jObject["error"] as? String {
+                                completionHandler?(error, nil)
+                                return
+                            }
+                        }
+                    }
+                } else {
+                    completionHandler?(nil, profileResponse?.profile)
+                    return
+                }
+                
+                completionHandler?("An unknown error has occurred.", nil)
+                return
+            }
+            
+            completionHandler?("An unknown error has occurred.", nil)
+            return
+        }.resume()
     }
     
     // MARK: - Data Senders
@@ -584,7 +667,7 @@ public class SwiftRant {
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
     /// - parameter rantID: The ID of the rant to vote on.
     /// - parameter vote: The vote state. 1 = upvote, 0 = neutral, -1 = downvote.
-    /// - parameter completionHandler: A function that will run after the request was completed. If the request was successful, the `String` parameter of the function will contain `nil`, and the ``Rant`` parameter of the function will hold the target rant with updated information. If the request was unsuccessful, the `String?` parameter will contain an error message, and the ``Rant`` will contain `nil`.
+    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String` parameter of the function will contain `nil`, and the ``Rant`` parameter of the function will hold the target rant with updated information. If the request was unsuccessful, the `String?` parameter will contain an error message, and the ``Rant`` will contain `nil`.
     public func voteOnRant(_ token: UserCredentials?, rantID id: Int, vote: Int, completionHandler: ((String?, Rant?) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
@@ -655,6 +738,160 @@ public class SwiftRant {
             
             completionHandler?("An unknown error has occurred.", nil)
             return
+        }.resume()
+    }
+    
+    /// Vote on a rant.
+    ///
+    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    /// - parameter commentID: The ID of the comment to vote on.
+    /// - parameter vote: The vote state. 1 = upvote, 0 = neutral, -1 = downvote.
+    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String` parameter of the function will contain `nil`, and the ``Comment`` parameter of the function will hold the target comment with updated information. If the request was unsuccessful, the `String?` parameter will contain an error message, and the ``Comment`` will contain `nil`.
+    public func voteOnComment(_ token: UserCredentials?, commentID id: Int, vote: Int, completionHandler: ((String?, Comment?) -> Void)?) {
+        if !shouldUseKeychainAndUserDefaults {
+            guard token != nil else {
+                fatalError("No token was specified!")
+            }
+        } else {
+            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            
+            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+                let loginSemaphore = DispatchSemaphore(value: 0)
+                
+                var errorMessage: String?
+                
+                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
+                    if error != nil {
+                        errorMessage = error
+                        loginSemaphore.signal()
+                        return
+                    }
+                    
+                    loginSemaphore.signal()
+                }
+                
+                loginSemaphore.wait()
+                
+                if errorMessage != nil {
+                    completionHandler?(errorMessage, nil)
+                    return
+                }
+            }
+        }
+        
+        let resourceURL = URL(string: baseURL + "/comments/\(id)/vote".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+        
+        var request = URLRequest(url: resourceURL)
+        
+        request.httpMethod = "POST"
+        request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        request.httpBody = "app=3&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)&vote=\(vote)".data(using: .utf8)
+        
+        let session = URLSession(configuration: .default)
+        
+        session.dataTask(with: request) { data, response, error in
+            if let data = data {
+                let decoder = JSONDecoder()
+                
+                let updatedCommentInfo = try? decoder.decode(CommentResponse.self, from: data)
+                
+                if updatedCommentInfo == nil {
+                    let jsonObject = try? JSONSerialization.jsonObject(with: data, options: [])
+                    
+                    if let jsonObject = jsonObject {
+                        if let jObject = jsonObject as? [String:Any] {
+                            if let error = jObject["error"] as? String {
+                                completionHandler?(error, nil)
+                                return
+                            }
+                        }
+                    }
+                } else {
+                    completionHandler?(nil, updatedCommentInfo?.comment)
+                    return
+                }
+                
+                completionHandler?("An unknown error has occurred.", nil)
+                return
+            }
+            
+            completionHandler?("An unknown error has occurred.", nil)
+            return
+        }.resume()
+    }
+    
+    /// Updates the summary of the user whose token is used.
+    ///
+    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    /// - parameter aboutSection: The user's about section.
+    /// - parameter skills: The user's list of skills.
+    /// - parameter githubLink: The user's GitHub link.
+    /// - parameter location: The user's location.
+    /// - parameter website: The user's personal website.
+    /// - parameter completionHandler: A function that wil run after the request was completed. If the request was successful, the `String?` parameter of the function will contain `nil`. If the request was unsuccessful, the `String?` parameter of the function will hold an error message.
+    public func editProfileDetails(_ token: UserCredentials?, aboutSection: String?, skills: String?, githubLink: String?, location: String?, website: String?, completionHandler: ((String?) -> Void)?) {
+        if !shouldUseKeychainAndUserDefaults {
+            guard token != nil else {
+                fatalError("No token was specified!")
+            }
+        } else {
+            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            
+            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+                let loginSemaphore = DispatchSemaphore(value: 0)
+                
+                var errorMessage: String?
+                
+                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
+                    if error != nil {
+                        errorMessage = error
+                        loginSemaphore.signal()
+                        return
+                    }
+                    
+                    loginSemaphore.signal()
+                }
+                
+                loginSemaphore.wait()
+                
+                if errorMessage != nil {
+                    completionHandler?(errorMessage)
+                    return
+                }
+            }
+        }
+        
+        let resourceURL = URL(string: baseURL + "/users/me/edit-profile".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+        
+        var request = URLRequest(url: resourceURL)
+        
+        request.httpMethod = "POST"
+        request.httpBody = "app=3&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)&profile_about=\(aboutSection ?? "")&profile_skills=\(skills ?? "")&profile_github=\(githubLink ?? "")&profile_location=\(location ?? "")&profile_website=\(website ?? "")".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!.data(using: .utf8)
+        
+        let session = URLSession(configuration: .default)
+        
+        session.dataTask(with: request) { data, response, error in
+            if let data = data {
+                let jsonObject = try? JSONSerialization.jsonObject(with: data, options: [])
+                
+                if let jsonObject = jsonObject {
+                    if let jObject = jsonObject as? [String:Any] {
+                        if let success = jObject["success"] as? Bool {
+                            if success {
+                                completionHandler?(nil)
+                                return
+                            } else {
+                                if let error = jObject["error"] as? String {
+                                    completionHandler?(error)
+                                    return
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            completionHandler?("An unknown error has occurred.")
         }.resume()
     }
 }

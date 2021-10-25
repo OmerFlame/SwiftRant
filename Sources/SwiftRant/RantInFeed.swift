@@ -15,62 +15,63 @@ public struct RantInFeed: Decodable, Identifiable {
     public let id: Int
     
     /// The rant's text content.
-    let text: String
+    public let text: String
     
     /// The current score of the rant.
-    var score: Int
+    public var score: Int
     
     /// The Unix timestamp at which the rant was posted.
-    let createdTime: Int
+    public let createdTime: Int
     
     /// If the rant has an image attached to it, the variable will contain information about it.
-    let attachedImage: Rant.AttachedImage?
+    public let attachedImage: Rant.AttachedImage?
     
     /// The amount of comments for this rant.
-    let commentCount: Int
+    public let commentCount: Int
     
     /// The tags this rant is listed under.
-    let tags: [String]
+    public let tags: [String]
     
     /// The current logged-in user's vote on the rant.
-    /// * 1 = upvote
-    /// * 0 = unvoted
-    /// * -1 = downvote
-    var voteState: Int
+    /// * `1` = Upvote
+    /// * `0` = Unvoted
+    /// * `-1` = Downvote
+    /// * `-2` = Voting disabled (the rant belongs to the user whose token was used to fetch the rant)
+    public var voteState: Int
     
     /// Whether or not the rant was edited in the past.
-    let isEdited: Bool
+    public let isEdited: Bool
     
     /// A link to the rant.
-    let link: String?
+    public let link: String?
     
     /// If the rant is a collab, this will contain the type of the collab in short.
-    /// * 1 = Open source idea
-    /// * 2 = Existing open source project
-    /// * 3 = Project idea
-    /// * 4 = Existing project
-    let collabType: Int?
+    /// * `1` = Open source idea
+    /// * `2` = Existing open source project
+    /// * `3` = Project idea
+    /// * `4` = Existing project
+    public let collabType: Int?
     
     /// If the rant is a collab, this will contain the type of the collab as a full string.
-    let collabTypeLong: String?
+    public let collabTypeLong: String?
     
     /// The author's devRant user ID.
-    let userID: Int
+    public let userID: Int
     
     /// The author's devRant username.
-    let username: String
+    public let username: String
     
     /// The author's score on devRant.
-    let userScore: Int
+    public let userScore: Int
     
     /// The author's avatar, can be used optimally for small portraits of the user.
-    let userAvatar: Rant.UserAvatar
+    public let userAvatar: Rant.UserAvatar
     
     /// A larger version of the author's avatar, can be used optimally for profile screens.
-    let userAvatarLarge: Rant.UserAvatar
+    public let userAvatarLarge: Rant.UserAvatar
     
     /// If the user is subscribed to devRant++, this property will be equal to `1`. If not, this property will either be `nil` or `0`.
-    let isUserDPP: Int?
+    public let isUserDPP: Int?
     
     enum CodingKeys: String, CodingKey {
         case id,

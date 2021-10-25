@@ -152,9 +152,10 @@ public struct Rant: Decodable, Identifiable {
     /**
      The current logged-in user's vote on the rant.
      
-     * 1 = upvote
-     * 0 = unvoted
-     * -1 = downvote
+     * `1` = upvote
+     * `0` = unvoted
+     * `-1` = downvote
+     * `-2` = voting disabled (the rant belongs to the user whose token was used to fetch the rant)
      */
     public var voteState: Int
     

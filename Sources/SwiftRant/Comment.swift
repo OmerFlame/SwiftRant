@@ -30,6 +30,7 @@ public struct Comment: Decodable, Identifiable {
     /// * 1 = upvote
     /// * 0 = unvoted
     /// * -1 = downvote
+    /// * -2 = voting disabled (the comment belongs to the user whose token was used to fetch the comment)
     public var voteState: Int
     
     /// If the comment includes URLs in the text, those that were successfully parsed by the server will be in this array.

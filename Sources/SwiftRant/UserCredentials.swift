@@ -7,11 +7,21 @@
 
 import Foundation
 
+/// A structure representing a user's credentials for accessing the devRant servers.
 public struct UserCredentials: Codable, Equatable {
+    
+    /// A structure representing a user's auth token.
     public struct AuthToken: Codable {
+        /// The user's token ID.
         public let tokenID: Int
+        
+        /// The user's token key.
         public let tokenKey: String
+        
+        /// The token's expire time.
         public let expireTime: Int
+        
+        /// The user's ID.
         public let userID: Int
         
         private enum CodingKeys: String, CodingKey {
@@ -40,6 +50,7 @@ public struct UserCredentials: Codable, Equatable {
         }
     }
     
+    /// The user's auth token.
     public let authToken: AuthToken
     
     private enum CodingKeys: String, CodingKey {
