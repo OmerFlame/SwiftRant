@@ -1079,11 +1079,79 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error as occurred.", nil)
+            completionHandler?("An unknown error has occurred.", nil)
             return
         }.resume()
     }
     #endif
+    
+    /// Deletes a post from devRant.
+    ///
+    /// - parameter token: The user's token. Set to `nil` if the SwifrRant instance was configured to use the Keychain and User Defaults.
+    /// - parameter rantID: The ID of the post or rant to be deleted.
+    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If he request was unsuccessful, the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
+    public func deleteRant(_ token: UserCredentials?, rantID: Int, completionHandler: ((String?, Bool) -> Void)?) {
+        if !shouldUseKeychainAndUserDefaults {
+            guard token != nil else {
+                fatalError("No token was specified!")
+            }
+        } else {
+            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            
+            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+                let loginSemaphore = DispatchSemaphore(value: 0)
+                
+                var errorMessage: String?
+                
+                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
+                    if error != nil {
+                        errorMessage = error
+                        loginSemaphore.signal()
+                        return
+                    }
+                    
+                    loginSemaphore.signal()
+                }
+                
+                loginSemaphore.wait()
+                
+                if errorMessage != nil {
+                    completionHandler?(errorMessage, false)
+                    return
+                }
+            }
+        }
+        
+        let resourceURL = URL(string: "\(baseURL)/devrant/rants/\(rantID)?app=3&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+        
+        var request = URLRequest(url: resourceURL)
+        
+        request.httpMethod = "DELETE"
+        request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        
+        let session = URLSession(configuration: .default)
+        
+        session.dataTask(with: request) { data, response, error in
+            if let data = data {
+                if let jsonObject = try? JSONSerialization.jsonObject(with: data, options: []) {
+                    if let jObject = jsonObject as? [String: Any] {
+                        if let success = jObject["success"] as? Bool {
+                            if success {
+                                completionHandler?(nil, success)
+                                return
+                            } else {
+                                completionHandler?(jObject["error"] as? String, false)
+                                return
+                            }
+                        }
+                    }
+                }
+            }
+            
+            completionHandler?("An unknown error has occurred.", false)
+            return
+        }.resume()
+    }
     
     // MARK: - Miscellaneous
     
