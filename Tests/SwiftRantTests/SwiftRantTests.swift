@@ -569,4 +569,62 @@ Before panicking, please make sure that:
         UserDefaults.resetStandardUserDefaults()
         SecItemDelete(query as CFDictionary)
     }
+    
+    func testUnfavoriteRant() throws {
+        let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
+        
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        print("Enter your real username: ", terminator: "")
+        let username = readLine()
+        
+        print("Enter your real password: ", terminator: "")
+        let password = readLine()
+        
+        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
+            XCTAssertNil(error)
+            
+            print("Please enter the ID of the rant that you want to unfavorite: ", terminator: "")
+            var rantID = Int(readLine() ?? "")
+            
+            while rantID == nil {
+                print("Invalid rant ID. Only digits are allowed.")
+                print("Please enter the ID of the rant that you want to unfavorite: ", terminator: "")
+                rantID = Int(readLine() ?? "")
+            }
+            
+            SwiftRant.shared.unfavoriteRant(nil, rantID: rantID!) { error, success in
+                if !success {
+                    if let error = error {
+                        XCTExpectFailure("""
+Something failed, but it might be completely expected.
+This is the error that the function returned: \(error)
+
+Before panicking, please make sure that:
+
+1. The post exists on devRant.
+2. None of the user's login credentials (username and/or password) have been changed externally while sending the request.
+""") {
+                            XCTFail()
+                        }
+                    }
+                }
+                
+                semaphore.signal()
+            }
+        }
+        
+        semaphore.wait()
+        
+        let query: [String:Any] = [kSecClass as String: kSecClassGenericPassword,
+                                   kSecMatchLimit as String: kSecMatchLimitOne,
+                                   kSecReturnAttributes as String: true,
+                                   kSecReturnData as String: true,
+                                   kSecAttrLabel as String: "SwiftRant-Attached Account" as CFString
+        ]
+        
+        keychainWrapper.removeAllKeys()
+        UserDefaults.resetStandardUserDefaults()
+        SecItemDelete(query as CFDictionary)
+    }
 }
