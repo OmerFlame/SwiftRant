@@ -187,7 +187,7 @@ public class SwiftRant {
                         //didSucceed = self.keychainWrapper.set(password, forKey: "DRPassword", withAccessibility: .whenUnlockedThisDeviceOnly, isSynchronizable: false)
                         //print("DID SUCCEED IN WRITING PASSWORD TO KEYCHAIN: \(didSucceed)")
                         
-                        var didSucceed = self.keychainWrapper.encodeAndSet(token, forKey: "DRToken", withAccessibility: .whenUnlockedThisDeviceOnly)
+                        let didSucceed = self.keychainWrapper.encodeAndSet(token, forKey: "DRToken", withAccessibility: .whenUnlockedThisDeviceOnly)
                         print("DID SUCCEED IN WRITING TOKEN TO KEYCHAIN: \(didSucceed)")
                         
                         //UserDefaults.standard.set(username, forKey: "DRUsername")
@@ -996,11 +996,11 @@ public class SwiftRant {
     /// Posts a rant to devRant.
     ///
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter postType: The type of post.
+    /// - parameter postType: The type of the post.
     /// - parameter content: The text content of the post.
     /// - parameter tags: The post's associated tags.
     /// - parameter image: An image to attach to the post.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Int?` parameter of the function will contain the ID of the post. If the the request was unsuccessful, the `String?` parameter will contain an error message, and the `Int?` will contain `nil`.
+    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Int?` parameter of the function will contain the ID of the post. If the request was unsuccessful, the `String?` parameter will contain an error message, and the `Int?` will contain `nil`.
     public func postRant(_ token: UserCredentials?, postType: Rant.RantType, content: String, tags: String?, image: NSImage?, completionHandler: ((String?, Int?) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
@@ -1054,7 +1054,7 @@ public class SwiftRant {
                 "type": String(postType.rawValue)
             ]
             
-            request.httpBody = createBody(parameters: paramList, boundary: boundary, data: image != nil ? jpegDataFrom(image: image!) : nil)
+            request.httpBody = createBody(parameters: paramList, boundary: boundary, data: image != nil ? jpegData(from: image!) : nil)
         } else {
             request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
             request.httpBody = "token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)&rant=\(content)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&tags=\(tags ?? "")&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&type=\(postType.rawValue)&app=3".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!.data(using: .utf8)
@@ -1288,6 +1288,192 @@ public class SwiftRant {
         }.resume()
     }
     
+    #if os(iOS) || targetEnvironment(macCatalyst)
+    /// Edits a posted rant.
+    ///
+    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    /// - parameter rantID: The ID of the rant to be edited.
+    /// - parameter postType: The new type of the post.
+    /// - parameter content: The new text content of the post.
+    /// - parameter tags: The post's new associated tags.
+    /// - parameter image: A new image to attach to the post.
+    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If the request was unsuccessful, the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
+    public func editRant(_ token: UserCredentials?, rantID: Int, postType: Rant.RantType, content: String, tags: String?, image: UIImage?, completionHandler: ((String?, Bool) -> Void)?) {
+        if !shouldUseKeychainAndUserDefaults {
+            guard token != nil else {
+                fatalError("No token was specified!")
+            }
+        } else {
+            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            
+            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+                let loginSemaphore = DispatchSemaphore(value: 0)
+                
+                var errorMessage: String?
+                
+                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
+                    if error != nil {
+                        errorMessage = error
+                        loginSemaphore.signal()
+                        return
+                    }
+                    
+                    loginSemaphore.signal()
+                }
+                
+                loginSemaphore.wait()
+                
+                if errorMessage != nil {
+                    completionHandler?(errorMessage, false)
+                    return
+                }
+            }
+        }
+        
+        let resourceURL = URL(string: "\(baseURL)/devrant/rants/\(rantID)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+        
+        var request = URLRequest(url: resourceURL)
+        
+        request.httpMethod = "POST"
+        
+        if image != nil {
+            let boundary = UUID().uuidString
+            
+            request.addValue("multipart/form-data; boundary\(boundary)", forHTTPHeaderField: "Content-Type")
+            
+            let paramList: [String: String] = [
+                "app": "3",
+                "rant": content,
+                "tags": (tags != nil ? tags! : ""),
+                "token_id": String(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID),
+                "token_key": String(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey),
+                "user_id": String(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID),
+                "type": String(postType.rawValue)
+            ]
+            
+            request.httpBody = createBody(parameters: paramList, boundary: boundary, data: image?.jpegData(compressionQuality: 1.0))
+        } else {
+            request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+            request.httpBody = "token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)&rant=\(content)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&tags=\(tags ?? "")&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&type=\(postType.rawValue)&app=3".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!.data(using: .utf8)
+        }
+        
+        let session = URLSession(configuration: .default)
+        
+        session.dataTask(with: request) { data, response, error in
+            if let data = data {
+                if let jsonObject = try? JSONSerialization.jsonObject(with: data, options: []) {
+                    if let jObject = jsonObject as? [String: Any] {
+                        if let success = jObject["success"] as? Bool {
+                            if success {
+                                completionHandler?(nil, true)
+                                return
+                            } else {
+                                completionHandler?(jObject["error"] as? String, false)
+                                return
+                            }
+                        }
+                    }
+                }
+            }
+            
+            completionHandler?("An unknown error has occurred.", false)
+            return
+        }.resume()
+    }
+    #else
+    /// Edits a posted rant.
+    ///
+    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    /// - parameter rantID: The ID of the rant to be edited.
+    /// - parameter postType: The new type of the post.
+    /// - parameter content: The new text content of the post.
+    /// - parameter tags: The post's new associated tags.
+    /// - parameter image: A new image to attach to the post.
+    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If the request was unsuccessful, the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
+    public func editRant(_ token: UserCredentials?, rantID: Int, postType: Rant.RantType, content: String, tags: String?, image: NSImage?, completionHandler: ((String?, Bool) -> Void)?) {
+        if !shouldUseKeychainAndUserDefaults {
+            guard token != nil else {
+                fatalError("No token was specified!")
+            }
+        } else {
+            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            
+            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+                let loginSemaphore = DispatchSemaphore(value: 0)
+                
+                var errorMessage: String?
+                
+                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
+                    if error != nil {
+                        errorMessage = error
+                        loginSemaphore.signal()
+                        return
+                    }
+                    
+                    loginSemaphore.signal()
+                }
+                
+                loginSemaphore.wait()
+                
+                if errorMessage != nil {
+                    completionHandler?(errorMessage, false)
+                    return
+                }
+            }
+        }
+        
+        let resourceURL = URL(string: "\(baseURL)/devrant/rants/\(rantID)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+        
+        var request = URLRequest(url: resourceURL)
+        
+        request.httpMethod = "POST"
+    
+        if image != nil {
+            let boundary = UUID().uuidString
+            
+            request.addValue("multipart/form-data; boundary\(boundary)", forHTTPHeaderField: "Content-Type")
+            
+            let paramList: [String: String] = [
+                "app": "3",
+                "rant": content,
+                "tags": (tags != nil ? tags! : ""),
+                "token_id": String(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID),
+                "token_key": String(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey),
+                "user_id": String(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID),
+                "type": String(postType.rawValue)
+            ]
+            
+            request.httpBody = createBody(parameters: paramList, boundary: boundary, data: jpegData(from: image!))
+        } else {
+            request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+            request.httpBody = "token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)&rant=\(content)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&tags=\(tags ?? "")&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&type=\(postType.rawValue)&app=3".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!.data(using: .utf8)
+        }
+        
+        let session = URLSession(configuration: .default)
+        
+        session.dataTask(with: request) { data, response, error in
+            if let data = data {
+                if let jsonObject = try? JSONSerialization.jsonObject(with: data, options: []) {
+                    if let jObject = jsonObject as? [String: Any] {
+                        if let success = jObject["success"] as? Bool {
+                            if success {
+                                completionHandler?(nil, true)
+                                return
+                            } else {
+                                completionHandler?(jObject["error"] as? String, false)
+                                return
+                            }
+                        }
+                    }
+                }
+            }
+            
+            completionHandler?("An unknown error has occurred.", false)
+            return
+        }.resume()
+    }
+    #endif
+    
     // MARK: - Miscellaneous
     
     private func createBody(parameters: [String: String],
@@ -1317,7 +1503,7 @@ public class SwiftRant {
     }
     
     #if os(macOS)
-    func jpegDataFrom(image:NSImage) -> Data {
+    func jpegData(from image: NSImage) -> Data {
         let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil)!
         let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
         let jpegData = bitmapRep.representation(using: NSBitmapImageRep.FileType.jpeg, properties: [:])!

@@ -512,6 +512,7 @@ Before panicking, please make sure that:
         SecItemDelete(query as CFDictionary)
     }
     
+    // WARNING: DO NOT RUN THIS TOO MANY TIMES, THE ACCOUNT THAT YOU ARE LOGGING IN WITH MIGHT BE BANNED FOR SPAMMING!!!
     func testFavoriteRant() throws {
         let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
         
@@ -570,6 +571,7 @@ Before panicking, please make sure that:
         SecItemDelete(query as CFDictionary)
     }
     
+    // WARNING: DO NOT RUN THIS TOO MANY TIMES, THE ACCOUNT THAT YOU ARE LOGGING IN WITH MIGHT BE BANNED FOR SPAMMING!!!
     func testUnfavoriteRant() throws {
         let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
         
@@ -594,6 +596,103 @@ Before panicking, please make sure that:
             }
             
             SwiftRant.shared.unfavoriteRant(nil, rantID: rantID!) { error, success in
+                if !success {
+                    if let error = error {
+                        XCTExpectFailure("""
+Something failed, but it might be completely expected.
+This is the error that the function returned: \(error)
+
+Before panicking, please make sure that:
+
+1. The post exists on devRant.
+2. None of the user's login credentials (username and/or password) have been changed externally while sending the request.
+""") {
+                            XCTFail()
+                        }
+                    }
+                }
+                
+                semaphore.signal()
+            }
+        }
+        
+        semaphore.wait()
+        
+        let query: [String:Any] = [kSecClass as String: kSecClassGenericPassword,
+                                   kSecMatchLimit as String: kSecMatchLimitOne,
+                                   kSecReturnAttributes as String: true,
+                                   kSecReturnData as String: true,
+                                   kSecAttrLabel as String: "SwiftRant-Attached Account" as CFString
+        ]
+        
+        keychainWrapper.removeAllKeys()
+        UserDefaults.resetStandardUserDefaults()
+        SecItemDelete(query as CFDictionary)
+    }
+    
+    // WARNING: DO NOT RUN THIS TOO MANY TIMES, THE ACCOUNT THAT YOU ARE LOGGING IN WITH MIGHT BE BANNED FOR SPAMMING!!!
+    func testEditRant() throws {
+        let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
+        
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        print("Enter your real username: ", terminator: "")
+        let username = readLine()
+        
+        print("Enter your real password: ", terminator: "")
+        let password = readLine()
+        
+        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
+            XCTAssertNil(error)
+            
+            print("Please enter the ID of the rant that you want to edit: ", terminator: "")
+            var rantID = Int(readLine() ?? "")
+            
+            while rantID == nil {
+                print("Invalid rant ID. Only digits are allowed.")
+                print("Please enter the ID of the rant that you want to edit: ", terminator: "")
+                rantID = Int(readLine() ?? "")
+            }
+            
+            print("Please enter the rant's new text body: ", terminator: "")
+            var content = readLine() ?? ""
+            
+            while content.count <= 6 {
+                print("Invalid body. You must enter more than 6 characters.")
+                print("Please enter the rant's new text body: ", terminator: "")
+                
+                content = readLine() ?? ""
+            }
+            
+            print("Please enter the rant's new post type.")
+            print("""
+        Available post types:
+        1: rant
+        2: collab
+        3: meme
+        4: question
+        5: devRant
+        6: random
+        7: undefined
+        """)
+            
+            print("Enter post type [1-7]: ", terminator: "")
+            var postTypeID = Int(readLine() ?? "") ?? -1
+            
+            while !(1...7).contains(postTypeID) {
+                print("Invalid post type entered.")
+                print("Enter post type [1-7]: ", terminator: "")
+                postTypeID = Int(readLine() ?? "") ?? -1
+            }
+            
+            let postType = Rant.RantType(rawValue: postTypeID)!
+            
+            print("Please enter the rant's new tags (comma-separated, supports spaces, press ENTER with no input to provide no tags): ", terminator: "")
+            let tags = readLine()
+            
+            print("NOTE: Adding images in tests are not supported.")
+            
+            SwiftRant.shared.editRant(nil, rantID: rantID!, postType: postType, content: content, tags: tags, image: nil) { error, success in
                 if !success {
                     if let error = error {
                         XCTExpectFailure("""
