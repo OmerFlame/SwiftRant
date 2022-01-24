@@ -726,4 +726,75 @@ Before panicking, please make sure that:
         UserDefaults.resetStandardUserDefaults()
         SecItemDelete(query as CFDictionary)
     }
+    
+    // WARNING: DO NOT RUN THIS TOO MANY TIMES, THE ACCOUNT THAT YOU ARE LOGGING IN WITH MIGHT BE BANNED FOR SPAMMING!!!
+    func testPostComment() throws {
+        let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
+        
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        print("Enter your real username: ", terminator: "")
+        let username = readLine()
+        
+        print("Enter your real password: ", terminator: "")
+        let password = readLine()
+        
+        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
+            XCTAssertNil(error)
+            
+            print("Please enter the ID of the rant to post a comment under: ", terminator: "")
+            var rantID = Int(readLine() ?? "")
+            
+            while rantID == nil {
+                print("Invalid rant ID. Only digits are allowed.")
+                print("Please enter the ID of the rant that you want to edit: ", terminator: "")
+                rantID = Int(readLine() ?? "")
+            }
+            
+            print("Please print the text inside the comment: ", terminator: "")
+            var content = readLine() ?? ""
+            
+            while content.count <= 6 {
+                print("Invalid body. You must enter more than 6 characters.")
+                print("Please enter the rant's new text body: ", terminator: "")
+                
+                content = readLine() ?? ""
+            }
+            
+            print("NOTE: Images in tests are not supported.")
+            
+            SwiftRant.shared.postComment(nil, rantID: rantID!, content: content, image: nil) { error, success in
+                if !success {
+                    if let error = error {
+                        XCTExpectFailure("""
+Something failed, but it might be completely expected.
+This is the error that the function returned: \(error)
+
+Before panicking, please make sure that:
+
+1. The post exists on devRant.
+2. None of the user's login credentials (username and/or password) have been changed externally while sending the request.
+""") {
+                            XCTFail()
+                        }
+                    }
+                }
+                
+                semaphore.signal()
+            }
+        }
+        
+        semaphore.wait()
+        
+        let query: [String:Any] = [kSecClass as String: kSecClassGenericPassword,
+                                   kSecMatchLimit as String: kSecMatchLimitOne,
+                                   kSecReturnAttributes as String: true,
+                                   kSecReturnData as String: true,
+                                   kSecAttrLabel as String: "SwiftRant-Attached Account" as CFString
+        ]
+        
+        keychainWrapper.removeAllKeys()
+        UserDefaults.resetStandardUserDefaults()
+        SecItemDelete(query as CFDictionary)
+    }
 }
