@@ -930,4 +930,122 @@ Before panicking, please make sure that:
         UserDefaults.resetStandardUserDefaults()
         SecItemDelete(query as CFDictionary)
     }
+    
+    func testGetAvatarCustomizationOptions() throws {
+        let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
+        
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        print("Enter your real username: ", terminator: "")
+        let username = readLine()
+        
+        print("Enter your real password: ", terminator: "")
+        let password = readLine()
+        
+        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
+            XCTAssertNil(error)
+            
+            print("Please enter the type of customization that you want to get options for: ", terminator: "")
+            var type = readLine()
+            
+            while type == nil {
+                print("Invalid type specified.")
+                print("Please enter the type of customization that you want to get options for: ", terminator: "")
+                type = readLine()
+            }
+            
+            print("Please enter the sub-type of customization that you want to get the options for (no input is also accepted): ", terminator: "")
+            var subType = Int(readLine() ?? "")
+            
+            while subType == nil {
+                print("Invalid sub-type provided. Only numbers are allowed.")
+                print("Please enter the sub-type of customization that you want to get the options for (no input is also accepted): ", terminator: "")
+                subType = Int(readLine() ?? "")
+            }
+            
+            print("Please enter the current ID of the image of the user: ", terminator: "")
+            let currentImageID = readLine()!
+            
+            SwiftRant.shared.getAvatarCustomizationOptions(nil, type: type!, subType: subType, currentImageID: currentImageID, shouldGetPossibleOptions: true) { error, results in
+                XCTAssertNil(error)
+                
+                //raise(SIGTRAP)
+                
+                print("BREAKPOINT")
+                
+                semaphore.signal()
+            }
+        }
+        
+        semaphore.wait()
+        
+        let query: [String:Any] = [kSecClass as String: kSecClassGenericPassword,
+                                   kSecMatchLimit as String: kSecMatchLimitOne,
+                                   kSecReturnAttributes as String: true,
+                                   kSecReturnData as String: true,
+                                   kSecAttrLabel as String: "SwiftRant-Attached Account" as CFString
+        ]
+        
+        keychainWrapper.removeAllKeys()
+        UserDefaults.resetStandardUserDefaults()
+        SecItemDelete(query as CFDictionary)
+    }
+    
+    func testConfirmAvatarCustomization() throws {
+        let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
+        
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        print("Enter your real username: ", terminator: "")
+        let username = readLine()
+        
+        print("Enter your real password: ", terminator: "")
+        let password = readLine()
+        
+        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
+            XCTAssertNil(error)
+            
+            print("Please enter the ID of the new full avatar image: ", terminator: "")
+            var fullImageID = readLine()
+            
+            while fullImageID == nil {
+                print("Invalid ID provided.")
+                print("Please enter the ID of the new full avatar image: ", terminator: "")
+                fullImageID = readLine()
+            }
+            
+            SwiftRant.shared.confirmAvatarCustomization(nil, fullImageID: fullImageID!) { error, success in
+                if !success {
+                    if let error = error {
+                        XCTExpectFailure("""
+Something failed, but it might be completely expected.
+This is the error that the function returned: \(error)
+
+Before panicking, please make sure that:
+
+1. The user in question has enough ++'s in order to equip the new customizations.
+3. None of the user's login credentials (username and/or password) have been changed externally while sending the request.
+""") {
+                            XCTFail()
+                        }
+                    }
+                }
+                
+                semaphore.signal()
+            }
+        }
+        
+        semaphore.wait()
+        
+        let query: [String:Any] = [kSecClass as String: kSecClassGenericPassword,
+                                   kSecMatchLimit as String: kSecMatchLimitOne,
+                                   kSecReturnAttributes as String: true,
+                                   kSecReturnData as String: true,
+                                   kSecAttrLabel as String: "SwiftRant-Attached Account" as CFString
+        ]
+        
+        keychainWrapper.removeAllKeys()
+        UserDefaults.resetStandardUserDefaults()
+        SecItemDelete(query as CFDictionary)
+    }
 }

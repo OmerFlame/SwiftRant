@@ -666,6 +666,81 @@ public class SwiftRant {
         }.resume()
     }
     
+    /// Retrieves a set of avatar customization options listed under a specific type of customization.
+    ///
+    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    /// - parameter type: The type of customization to retrieve the options for.
+    /// - parameter subType: The sub-type of the type of customization to retrieve the options for. Not all customization types have a subtype, so this parameter is optional. If the type does not contain a sub-type, set `subOption` to `nil`.
+    /// - parameter currentImageID: The ID of the current avatar of the user.
+    /// - parameter shouldGetPossibleOptions: Whether or not the server should return the entire list of the different types and sub-types of customizations for a devRant avatar, alongside the query.
+    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the ``AvatarCustomizationResults`` parameter of the function will contain the query's results. If the request was unsuccessful, the `String?` parameter will contain an error message, and the ``AvatarCustomizationResults`` will contain `nil`.
+    public func getAvatarCustomizationOptions(_ token: UserCredentials?, type: String, subType: Int?, currentImageID: String, shouldGetPossibleOptions: Bool, completionHandler: ((String?, AvatarCustomizationResults?) -> Void)?) {
+        if !shouldUseKeychainAndUserDefaults {
+            guard token != nil else {
+                fatalError("No token was specified!")
+            }
+        } else {
+            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            
+            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+                let loginSemaphore = DispatchSemaphore(value: 0)
+                
+                var errorMessage: String?
+                
+                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
+                    if error != nil {
+                        errorMessage = error
+                        loginSemaphore.signal()
+                        return
+                    }
+                    
+                    loginSemaphore.signal()
+                }
+                
+                loginSemaphore.wait()
+                
+                if errorMessage != nil {
+                    completionHandler?(errorMessage, nil)
+                    return
+                }
+            }
+        }
+        
+        let resourceURL = URL(string: "\(baseURL)/devrant/avatars/build?app=3&option=\(type)&image_id=\(currentImageID)&features=\(shouldGetPossibleOptions ? 1 : 0)\(subType != nil ? "&sub_option=\(subType!)" : "")&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+        
+        var request = URLRequest(url: resourceURL)
+        
+        request.httpMethod = "GET"
+        request.addValue("x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        
+        let session = URLSession(configuration: .default)
+        
+        session.dataTask(with: request) { data, response, error in
+            if let data = data {
+                let results = try? JSONDecoder().decode(AvatarCustomizationResults.self, from: data)
+                
+                if results != nil {
+                    completionHandler?(nil, results)
+                    return
+                } else {
+                    let jsonObject = try? JSONSerialization.jsonObject(with: data, options: [])
+                    
+                    if let jsonObject = jsonObject {
+                        if let jObject = jsonObject as? [String: Any] {
+                            if let error = jObject["error"] as? String {
+                                completionHandler?(error, nil)
+                                return
+                            }
+                        }
+                    }
+                }
+            }
+            
+            completionHandler?("An unknown error has occurred.", nil)
+            return
+        }.resume()
+    }
+    
     // MARK: - Data Senders
     
     /// Vote on a rant.
@@ -673,7 +748,7 @@ public class SwiftRant {
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
     /// - parameter rantID: The ID of the rant to vote on.
     /// - parameter vote: The vote state. 1 = upvote, 0 = neutral, -1 = downvote.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String` parameter of the function will contain `nil`, and the ``Rant`` parameter of the function will hold the target rant with updated information. If the request was unsuccessful, the `String?` parameter will contain an error message, and the ``Rant`` will contain `nil`.
+    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the ``Rant`` parameter of the function will hold the target rant with updated information. If the request was unsuccessful, the `String?` parameter will contain an error message, and the ``Rant`` will contain `nil`.
     public func voteOnRant(_ token: UserCredentials?, rantID id: Int, vote: Int, completionHandler: ((String?, Rant?) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
@@ -1834,7 +1909,7 @@ public class SwiftRant {
     ///
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
     /// - parameter commentID: The ID of the comment to be deleted.
-    /// - parameter completionHandler: A function that will run after the request is completed, If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If the request was unsuccessful, the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
+    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If the request was unsuccessful, the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
     public func deleteComment(_ token: UserCredentials?, commentID: Int, completionHandler: ((String?, Bool) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
@@ -1872,6 +1947,76 @@ public class SwiftRant {
         var request = URLRequest(url: resourceURL)
         
         request.httpMethod = "DELETE"
+        request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        
+        let session = URLSession(configuration: .default)
+        
+        session.dataTask(with: request) { data, response, error in
+            if let data = data {
+                if let jsonObject = try? JSONSerialization.jsonObject(with: data, options: []) {
+                    if let jObject = jsonObject as? [String: Any] {
+                        if let success = jObject["success"] as? Bool {
+                            if success {
+                                completionHandler?(nil, true)
+                                return
+                            } else {
+                                completionHandler?(jObject["error"] as? String, false)
+                                return
+                            }
+                        }
+                    }
+                }
+            }
+            
+            completionHandler?("An unknown error has occurred.", false)
+            return
+        }.resume()
+    }
+    
+    /// Updates the avatar image for the given user.
+    ///
+    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    /// - parameter fullImageID: The ID of the new avatar image (a file name with the extension of .png).
+    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If the request was unsuccessful, the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
+    public func confirmAvatarCustomization(_ token: UserCredentials?, fullImageID: String, completionHandler: ((String?, Bool) -> Void)?) {
+        if !shouldUseKeychainAndUserDefaults {
+            guard token != nil else {
+                fatalError("No token was specified!")
+            }
+        } else {
+            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            
+            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+                let loginSemaphore = DispatchSemaphore(value: 0)
+                
+                var errorMessage: String?
+                
+                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
+                    if error != nil {
+                        errorMessage = error
+                        loginSemaphore.signal()
+                        return
+                    }
+                    
+                    loginSemaphore.signal()
+                }
+                
+                loginSemaphore.wait()
+                
+                if errorMessage != nil {
+                    completionHandler?(errorMessage, false)
+                    return
+                }
+            }
+        }
+        
+        let resourceURL = URL(string: "\(baseURL)/users/me/avatar".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+        
+        var request = URLRequest(url: resourceURL)
+        
+        request.httpMethod = "POST"
+        request.httpBody = "token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&app=3&image_id=\(fullImageID)&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!.data(using: .utf8)
+        
         request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         
         let session = URLSession(configuration: .default)
