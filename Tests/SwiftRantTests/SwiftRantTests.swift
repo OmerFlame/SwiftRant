@@ -1048,4 +1048,36 @@ Before panicking, please make sure that:
         UserDefaults.resetStandardUserDefaults()
         SecItemDelete(query as CFDictionary)
     }
+    
+    func testGetUserID() throws {
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        print("Please enter a username to get the ID of: ", terminator: "")
+        var username = readLine() ?? ""
+        
+        while username == "" {
+            print("Invalid input (must not be empty).")
+            print("Please enter a username to get the ID of: ", terminator: "")
+            username = readLine() ?? ""
+        }
+        
+        SwiftRant.shared.getUserID(of: username) { error, userID in
+            if let error = error {
+                XCTExpectFailure("""
+Something failed, but it might be completely expected.
+This is the error that the function returned: \(error)
+
+Before panicking, please make sure that there is a user that exists with the *exact* same username on devRant.
+""") {
+                    XCTFail()
+                }
+            } else {
+                print("GOT USER ID \(userID!) FOR USERNAME \(username)")
+            }
+            
+            semaphore.signal()
+        }
+        
+        semaphore.wait()
+    }
 }

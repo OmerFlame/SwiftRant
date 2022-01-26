@@ -588,6 +588,41 @@ public class SwiftRant {
         fatalError("Not implemented yet!")
     }
     
+    /// Retrieves the ID of a user with a specified username
+    ///
+    /// - parameter username: The username to get the ID for.
+    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch was successful, the `String?` parameter of the function will contain `nil`, and the `Int?` parameter of the function will contain the ID for the given username. If the fetch was unsuccessful, the `String?` parameter will contain an error message, and the `Int?` will contain `nil`.
+    public func getUserID(of username: String, completionHandler: ((String?, Int?) -> Void)?) {
+        let resourceURL = URL(string: "\(baseURL)/get-user-id?app=3&username=\(username)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+        
+        var request = URLRequest(url: resourceURL)
+        
+        request.httpMethod = "GET"
+        request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        
+        let session = URLSession(configuration: .default)
+        
+        session.dataTask(with: request) { data, response, error in
+            if let data = data {
+                if let jsonObject = try? JSONSerialization.jsonObject(with: data, options: []) {
+                    if let jObject = jsonObject as? [String: Any] {
+                        if let success = jObject["success"] as? Bool {
+                            if success {
+                                completionHandler?(nil, jObject["user_id"] as? Int)
+                                return
+                            } else {
+                                completionHandler?("User doesn't exist!", nil)
+                                return
+                            }
+                        }
+                    }
+                }
+            }
+            
+            completionHandler?("An unknown error has occurred.", nil)
+        }.resume()
+    }
+    
     /// Get a user's profile data.
     ///
     /// - parameter id: The ID of the user whose data will be fetched.
