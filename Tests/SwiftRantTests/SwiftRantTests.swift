@@ -1024,7 +1024,7 @@ This is the error that the function returned: \(error)
 Before panicking, please make sure that:
 
 1. The user in question has enough ++'s in order to equip the new customizations.
-3. None of the user's login credentials (username and/or password) have been changed externally while sending the request.
+2. None of the user's login credentials (username and/or password) have been changed externally while sending the request.
 """) {
                             XCTFail()
                         }
@@ -1079,5 +1079,54 @@ Before panicking, please make sure that there is a user that exists with the *ex
         }
         
         semaphore.wait()
+    }
+    
+    func testClearNotifications() throws {
+        let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
+        
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        print("Enter your real username: ", terminator: "")
+        let username = readLine()
+        
+        print("Enter your real password: ", terminator: "")
+        let password = readLine()
+        
+        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
+            XCTAssertNil(error)
+            
+            SwiftRant.shared.clearNotifications(nil) { error, success in
+                if !success {
+                    if let error = error {
+                        XCTExpectFailure("""
+Something failed, but it might be completely expected.
+This is the error that the function returned: \(error)
+
+Before panicking, please make sure that:
+
+1. The user exists on devRant.
+2. None of the user's login credentials (username and/or password) have been changed externally while sending the request.
+""") {
+                            XCTFail()
+                        }
+                    }
+                }
+                
+                semaphore.signal()
+            }
+        }
+        
+        semaphore.wait()
+        
+        let query: [String:Any] = [kSecClass as String: kSecClassGenericPassword,
+                                   kSecMatchLimit as String: kSecMatchLimitOne,
+                                   kSecReturnAttributes as String: true,
+                                   kSecReturnData as String: true,
+                                   kSecAttrLabel as String: "SwiftRant-Attached Account" as CFString
+        ]
+        
+        keychainWrapper.removeAllKeys()
+        UserDefaults.resetStandardUserDefaults()
+        SecItemDelete(query as CFDictionary)
     }
 }
