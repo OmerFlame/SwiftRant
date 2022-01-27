@@ -39,7 +39,7 @@ public class SwiftRant {
     /// The shared SwiftRant instance.
     ///
     /// This instance is configured to use the Keychain and User Defaults.
-    static let shared = SwiftRant()
+    public static let shared = SwiftRant()
     
     private let shouldUseKeychainAndUserDefaults: Bool
     
