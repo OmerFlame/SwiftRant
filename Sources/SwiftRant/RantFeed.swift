@@ -84,7 +84,7 @@ public struct RantFeed: Decodable {
     /// The Weekly Group Rant week number.
     public let weeklyRantWeek: Int?
     
-    /// If the user is subscribed to devRant++, this property will be equal to `1`. If not, this property will either be `nil` or `0`.
+    /// If the user is subscribed to devRant++, this property will be equal to `1`. If not, this property will either be equal to `0`.
     public let isUserDPP: Int
     
     /// The amount of unread notifications.
@@ -115,7 +115,7 @@ public struct RantFeed: Decodable {
         settings = try values.decode(Settings.self, forKey: .settings)
         set = try values.decode(String.self, forKey: .set)
         weeklyRantWeek = try? values.decode(Int.self, forKey: .weeklyRantWeek)
-        isUserDPP = try values.decode(Int.self, forKey: .isUserDPP)
+        isUserDPP = try values.decodeIfPresent(Int.self, forKey: .isUserDPP) ?? 0
         notifCount = try values.decode(Int.self, forKey: .notifCount)
         unread = try values.decode(Unread.self, forKey: .unread)
         news = try values.decode(News.self, forKey: .news)
