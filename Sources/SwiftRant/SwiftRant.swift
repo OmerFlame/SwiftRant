@@ -45,7 +45,7 @@ public class SwiftRant {
     
     private let baseURL = "https://devrant.com/api"
     
-    private let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
+    private let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant")
     
     /// The username stored in the system keychain.
     public var usernameFromKeychain: String? {
