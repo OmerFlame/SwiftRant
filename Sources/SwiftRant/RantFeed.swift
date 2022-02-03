@@ -88,14 +88,14 @@ public struct RantFeed: Decodable {
     public let isUserDPP: Int
     
     /// The amount of unread notifications.
-    /// - note: I have **no** idea why the developers of devRant duplicated this. It's a duplicate of ``unread/total``.
+    /// - note: I have **no** idea why the developers of devRant duplicated this. It's a duplicate of ``Unread-swift.struct/total``.
     public let notifCount: Int
     
     /// Contains the amount of unread notifications.
     public let unread: Unread
     
     /// The current weekly news.
-    public let news: News
+    public let news: News?
     
     private enum CodingKeys: String, CodingKey {
         case rants
@@ -118,6 +118,6 @@ public struct RantFeed: Decodable {
         isUserDPP = try values.decodeIfPresent(Int.self, forKey: .isUserDPP) ?? 0
         notifCount = try values.decode(Int.self, forKey: .notifCount)
         unread = try values.decode(Unread.self, forKey: .unread)
-        news = try values.decode(News.self, forKey: .news)
+        news = try values.decodeIfPresent(News.self, forKey: .news)
     }
 }
