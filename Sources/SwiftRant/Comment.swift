@@ -70,6 +70,28 @@ public struct Comment: Decodable, Identifiable {
              attachedImage = "attached_image"
     }
     
+    public mutating func precalculateLinkRanges() {
+        if links != nil {
+            let stringAsData = body.data(using: .utf8)!
+            
+            var temporaryStringBytes = Data()
+            var temporaryGenericUseString = ""
+            
+            for i in 0..<(links!.count) {
+                debugPrint("DECODING LINK!")
+                if links![i].start == nil && links![i].end == nil {
+                    links![i].calculatedRange = (body as NSString).range(of: links![i].title)
+                } else {
+                    temporaryStringBytes = stringAsData[stringAsData.index(stringAsData.startIndex, offsetBy: links![i].start!)..<stringAsData.index(stringAsData.startIndex, offsetBy: links![i].end!)]
+                    
+                    temporaryGenericUseString = String(data: temporaryStringBytes, encoding: .utf8)!
+                    
+                    links![i].calculatedRange = (body as NSString).range(of: temporaryGenericUseString)
+                }
+            }
+        }
+    }
+    
     public init(decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(Int.self, forKey: .id)

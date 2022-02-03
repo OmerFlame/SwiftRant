@@ -15,7 +15,7 @@ fileprivate struct RantResponse: Decodable {
     public var rant: Rant
     
     /// The comments listed under the rant.
-    public let comments: [Comment]?
+    public var comments: [Comment]?
     
     private enum CodingKeys: String, CodingKey {
         case rant, comments
@@ -25,7 +25,15 @@ fileprivate struct RantResponse: Decodable {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         
         rant = try values.decode(Rant.self, forKey: .rant)
+        
+        
         comments = try values.decodeIfPresent([Comment].self, forKey: .comments)
+        
+        if comments != nil {
+            for idx in 0..<comments!.count {
+                comments![idx].precalculateLinkRanges()
+            }
+        }
     }
 }
 
