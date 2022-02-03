@@ -93,6 +93,7 @@ public struct Comment: Decodable, Identifiable {
             var temporaryGenericUseString = ""
             
             for i in 0..<(links!.count) {
+                debugPrint("DECODING LINK!")
                 if links![i].start == nil && links![i].end == nil {
                     links![i].calculatedRange = (body as NSString).range(of: links![i].title)
                 } else {
