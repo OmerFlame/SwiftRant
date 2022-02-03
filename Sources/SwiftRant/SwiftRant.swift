@@ -16,6 +16,17 @@ fileprivate struct RantResponse: Decodable {
     
     /// The comments listed under the rant.
     public let comments: [Comment]?
+    
+    private enum CodingKeys: String, CodingKey {
+        case rant, comments
+    }
+    
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        
+        rant = try values.decode(Rant.self, forKey: .rant)
+        comments = try values.decodeIfPresent([Comment].self, forKey: .comments)
+    }
 }
 
 fileprivate struct CommentResponse: Decodable {
