@@ -558,10 +558,12 @@ public class SwiftRant {
         }.resume()
     }
     
-    // VERY EARLY PROTOTYPE TO GET THE USER'S SUBSCRIBED FEED.
-    // lastEndCursor is for infinite scroll/pagination.
-    // struct coming soon.
-    public func getSubscribedFeed(_ token: UserCredentials?, lastEndCursor: String?) {
+    /// Gets a personal rant feed based on the user's subscriptions and the activity of the users the user has subscribed to.
+    ///
+    /// - parameter token: The user's token. set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    /// - parameter lastEndCursor: The ``SubscribedFeed/PageInfo-swift.struct/endCursor`` you got from the last fetch. Set to `nil` if the SwiftRant instance was configured to use the Keychain and UserDefaults. the SwiftRant instance will get the last end cursor from the last fetch from User Defaults.
+    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch was successful, the `String?` parameter of the function will contain `nil` and the ``SubscribedFeed`` parameter of the function will contain the fetched Subscribed feed. If the fetch was unsuccessful, the `String?` parameter will contain an error message, and the ``SubscribedFeed`` parameter will contain `nil`.
+    public func getSubscribedFeed(_ token: UserCredentials?, lastEndCursor: String?, completionHandler: ((String?, SubscribedFeed?) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
                 fatalError("No token was specified!")
@@ -587,14 +589,13 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    // TODO: CREATE A COMPLETION HANDLER!
-                    //completionHandler?(errorMessage, nil)
+                    completionHandler?(errorMessage, nil)
                     return
                 }
             }
         }
         
-        let resourceURL = URL(string: baseURL + "/api/me/subscribed-feed?app=3&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+        let resourceURL = URL(string: baseURL + "/me/subscribed-feed?app=3&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)\(shouldUseKeychainAndUserDefaults ? (UserDefaults.standard.string(forKey: "DRLastEndCursor") != nil ? "&activity_before=\(UserDefaults.standard.string(forKey: "DRLastEndCursor")!)" : "") : (lastEndCursor != nil ? "&activity_before=\(lastEndCursor!)" : ""))".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
         
         var request = URLRequest(url: resourceURL)
         
@@ -603,8 +604,37 @@ public class SwiftRant {
         
         let session = URLSession(configuration: .default)
         
-        // TODO: WRITE THE REQUEST!
-        fatalError("Not implemented yet!")
+        session.dataTask(with: request) { data, response, error in
+            if let data = data {
+                let decoder = JSONDecoder()
+                
+                let subscribedFeed = try? decoder.decode(SubscribedFeed.self, from: data)
+                
+                if subscribedFeed == nil {
+                    let jsonObject = try? JSONSerialization.jsonObject(with: data, options: [])
+                    
+                    if let jsonObject = jsonObject {
+                        if let jObject = jsonObject as? [String: Any] {
+                            if let error = jObject["error"] as? String {
+                                completionHandler?(error, nil)
+                                return
+                            }
+                        }
+                    }
+                } else {
+                    UserDefaults.standard.set(subscribedFeed!.pageInfo.endCursor, forKey: "DRLastEndCursor")
+                    
+                    completionHandler?(nil, subscribedFeed)
+                    return
+                }
+                
+                completionHandler?("An unknown error has occurred.", nil)
+                return
+            }
+            
+            completionHandler?("An unknown error has occurred.", nil)
+            return
+        }.resume()
     }
     
     /// Retrieves the ID of a user with a specified username
@@ -2169,7 +2199,7 @@ public class SwiftRant {
     ///
     /// - Parameter username: The username of the user attempting to log in.
     /// - Parameter password: The password of the user attempting to log in.
-    /// - returns: A tuple that contains an error in a ``String`` and the token as a ``UserCredentials``.
+    /// - returns: A tuple that contains an error in a `String` and the token as a ``UserCredentials``.
     ///
     /// If the authentication is successful, the ``UserCredentials`` in the tuple will hold the actual auth token info, while the `String` in the tuple will be `nil`. If the authentication is unsuccessful, then the `String` in the tuple will hold an error message, while the ``UserCredentials`` in the tuple will be `nil`.
     ///
@@ -2187,7 +2217,7 @@ public class SwiftRant {
     /// - parameter token: The user's token. set to `nil`if the SwiftRant instance was configured to use the Keychain and User Defaults.
     /// - parameter skip: How many rants to skip before loading. Used for pagination/infinite scroll.
     /// - parameter prevSet: The ``RantFeed/set`` you got in the last fetch. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults, the SwiftRant instance will get the set from the last fetch from User Defaults.
-    /// - returns: A tuple that contains an error in a ``String`` and the feed as a ``RantFeed``. If the fetch is successful, the ``RantFeed`` in the tuple will hold the actual auth token info, while the `String` in the tuple is `nil`. If the fetch is unsuccessful, then the `String` in the tuple will hold an error message, while the ``RantFeed`` in the tuple will be `nil`.
+    /// - returns: A tuple that contains an error in a `String` and the feed as a ``RantFeed``. If the fetch is successful, the ``RantFeed`` in the tuple will hold the actual auth token info, while the `String` in the tuple is `nil`. If the fetch is unsuccessful, then the `String` in the tuple will hold an error message, while the ``RantFeed`` in the tuple will be `nil`.
     public func getRantFeed(token: UserCredentials?, skip: Int, prevSet: String?) async -> (String?, RantFeed?) {
         return await withCheckedContinuation { continuation in
             self.getRantFeed(token: token, skip: skip, prevSet: prevSet) { error, feed in
@@ -2202,7 +2232,7 @@ public class SwiftRant {
     /// - parameter lastCheckTime: The last Unix Timestamp at which the notifications were last checked at. Set to `nil` is the SwiftRant instance was configured to use Keychain and User Defaults, or if you set `shouldGetNewNotifs` to `false`.
     /// - parameter shouldGetNewNotifs: Whether or not the function should retrieve the latest notifications since the Unix Timestamp stored in User Defaults or `lastCheckTime`. If set to `false` and the SwiftRant instance was configured to use the Keychain and User Defaults, set `lastCheckTime` to `nil`. If set to `true` and the SwiftRant instance was NOT configured to use the Keychain and User Defaults, set `lastCheckTime` to the last Unix Timestamp at which the notifications were fetched last time.
     /// - parameter category: The category of notifications that the function should return.
-    /// - returns: A tuple that contains an error in a ``String`` and the notification feed as a ``Notifications``. If the fetch was successful, the ``Notifications`` in the tuple will hold the actual notification info, while the `String` in the tuple will be `nil`. If the fetch was unsuccessful, then the `String` in the tuple will hold an error message, while the ``Notifications`` in the tuple will be `nil`.
+    /// - returns: A tuple that contains an error in a `String` and the notification feed as a ``Notifications``. If the fetch was successful, the ``Notifications`` in the tuple will hold the actual notification info, while the `String` in the tuple will be `nil`. If the fetch was unsuccessful, then the `String` in the tuple will hold an error message, while the ``Notifications`` in the tuple will be `nil`.
     public func getNotificationFeed(token: UserCredentials?, lastCheckTime: Int?, shouldGetNewNotifs: Bool, category: Notifications.Categories) async -> (String?, Notifications?) {
         return await withCheckedContinuation { continuation in
             self.getNotificationFeed(token: token, lastCheckTime: lastCheckTime, shouldGetNewNotifs: shouldGetNewNotifs, category: category) { error, notifications in
@@ -2216,7 +2246,7 @@ public class SwiftRant {
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
     /// - parameter id: The ID of the rant to fetch.
     /// - parameter lastCommentID: If set to a valid comment ID that exists in the rant's comments, the function will get all the comments that were posted after the comment with the given ID.
-    /// - returns: A tuple that contains an error in a ``String``, the rant as a ``Rant`` and the rant's comments as an array of ``Comment``. If the fetch was successful, the ``Rant`` in the tuple will hold the actual rant info, the ``Comment`` array in the tuple will hold all the comments attached to the ``Rant`` and the `String` in the tuple will be `nil`. If the fetch was unsuccessful, then the `String` in the tuple will hold an error message, and the ``Rant`` and ``Comment`` array in the tuple will both be `nil`.
+    /// - returns: A tuple that contains an error in a `String`, the rant as a ``Rant`` and the rant's comments as an array of ``Comment``. If the fetch was successful, the ``Rant`` in the tuple will hold the actual rant info, the ``Comment`` array in the tuple will hold all the comments attached to the ``Rant`` and the `String` in the tuple will be `nil`. If the fetch was unsuccessful, then the `String` in the tuple will hold an error message, and the ``Rant`` and ``Comment`` array in the tuple will both be `nil`.
     public func getRantFromID(token: UserCredentials?, id: Int, lastCommentID: Int?) async -> (String?, Rant?, [Comment]?) {
         return await withCheckedContinuation { continuation in
             self.getRantFromID(token: token, id: id, lastCommentID: lastCommentID) { error, rant, comments in
@@ -2229,7 +2259,7 @@ public class SwiftRant {
     ///
     /// - parameter id: The ID of the comment to fetch.
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - returns: A tuple that contains an error in a ``String`` and the comment as a ``Comment``. If the fetch was successful, the `String` in the tuple  will contain `nil` and the ``Comment`` in the tuple will contain the fetched comment. If the fetch was unsuccessful, the `String?` in the tuple will contain an error message, and the ``Comment`` in the tuple will contain `nil`.
+    /// - returns: A tuple that contains an error in a `String` and the comment as a ``Comment``. If the fetch was successful, the `String` in the tuple  will contain `nil` and the ``Comment`` in the tuple will contain the fetched comment. If the fetch was unsuccessful, the `String?` in the tuple will contain an error message, and the ``Comment`` in the tuple will contain `nil`.
     public func getCommentFromID(_ id: Int, token: UserCredentials?) async -> (String?, Comment?) {
         return await withCheckedContinuation { continuation in
             self.getCommentFromID(id, token: token) { error, comment in
@@ -2238,10 +2268,23 @@ public class SwiftRant {
         }
     }
     
+    /// Gets a personal rant feed based on the user's subscriptions and the activity of the users the user has subscribed to.
+    ///
+    /// - parameter token: The user's token. set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    /// - parameter lastEndCursor: The ``SubscribedFeed/PageInfo-swift.struct/endCursor`` you got from the last fetch. Set to `nil` if the SwiftRant instance was configured to use the Keychain and UserDefaults. the SwiftRant instance will get the last end cursor from the last fetch from User Defaults.
+    /// - returns: A tuple that contains an error in a `String` and the Subscribed feed in a ``SubscribedFeed``. If the fetch was successful, the `String` in the tuple will contain `nil`, and the ``SubscribedFeed`` in the tuple will contain the Subscribed feed. If the fetch was unsuccessful, the `String` in the tuple will contain an error message, and the ``SubscribedFeed`` in the tuple will contain `nil`.
+    public func getSubscribedFeed(_ token: UserCredentials?, lastEndCursor: String?) async -> (String?, SubscribedFeed?) {
+        return await withCheckedContinuation { continuation in
+            self.getSubscribedFeed(token, lastEndCursor: lastEndCursor) { error, subscribedFeed in
+                continuation.resume(returning: (error, subscribedFeed))
+            }
+        }
+    }
+    
     /// Retrieves the ID of a user with a specified username
     ///
     /// - parameter username: The username to get the ID for.
-    /// - returns: A tuple that contains an error in a ``String`` and the user's ID in an ``Int``. If the fetch was successful, the `String?` in the tuple will contain `nil`, and the `Int?` in the tuple will contain the ID for the given username. If the fetch was unsuccessful, the `String?` in the tuple will contain an error message, and the `Int?` in the tuple will contain `nil`.
+    /// - returns: A tuple that contains an error in a `String` and the user's ID in an `Int`. If the fetch was successful, the `String` in the tuple will contain `nil`, and the `Int?` in the tuple will contain the ID for the given username. If the fetch was unsuccessful, the `String?` in the tuple will contain an error message, and the `Int?` in the tuple will contain `nil`.
     public func getUserID(of username: String) async -> (String?, Int?) {
         return await withCheckedContinuation { continuation in
             self.getUserID(of: username) { error, userID in
@@ -2255,7 +2298,7 @@ public class SwiftRant {
     /// - parameter id: The ID of the user whose data will be fetched.
     /// - parameter userContentType: The type of content created by the user to be fetched.
     /// - parameter skip: The amount of content to be skipped on. Useful for pagination/infinite scroll.
-    /// - returns: A tuple that contains an error in a ``String`` and the profile as a ``Profile``. If the fetch was successful, the `String?` in the tuple will contain `nil`, and the ``Profile`` in the tuple will hold the fetched profile information. If the fetch was unsuccessful, the `String?` in the tuple will contain an error message, and the ``Profile`` in the tuple will contain `nil`.
+    /// - returns: A tuple that contains an error in a `String` and the profile as a ``Profile``. If the fetch was successful, the `String?` in the tuple will contain `nil`, and the ``Profile`` in the tuple will hold the fetched profile information. If the fetch was unsuccessful, the `String?` in the tuple will contain an error message, and the ``Profile`` in the tuple will contain `nil`.
     public func getProfileFromID(_ id: Int, token: UserCredentials?, userContentType: Profile.ProfileContentTypes, skip: Int) async -> (String?, Profile?) {
         return await withCheckedContinuation { continuation in
             self.getProfileFromID(id, token: token, userContentType: userContentType, skip: skip) { error, profile in
@@ -2271,7 +2314,7 @@ public class SwiftRant {
     /// - parameter subType: The sub-type of the type of customization to retrieve the options for. Not all customization types have a subtype, so this parameter is optional. If the type does not contain a sub-type, set `subOption` to `nil`.
     /// - parameter currentImageID: The ID of the current avatar of the user.
     /// - parameter shouldGetPossibleOptions: Whether or not the server should return the entire list of the different types and sub-types of customizations for a devRant avatar, alongside the query.
-    /// - returns: A tuple that contains an error in a ``String`` and the query results as a ``AvatarCustomizationResults``. If the request was successful, the `String?` in the tuple will contain `nil`, and the ``AvatarCustomizationResults`` in the tuple will contain the query's results. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the ``AvatarCustomizationResults`` in the tuple will contain `nil`.
+    /// - returns: A tuple that contains an error in a `String` and the query results as a ``AvatarCustomizationResults``. If the request was successful, the `String?` in the tuple will contain `nil`, and the ``AvatarCustomizationResults`` in the tuple will contain the query's results. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the ``AvatarCustomizationResults`` in the tuple will contain `nil`.
     public func getAvatarCustomizationOptions(_ token: UserCredentials?, type: String, subType: Int?, currentImageID: String, shouldGetPossibleOptions: Bool) async -> (String?, AvatarCustomizationResults?) {
         return await withCheckedContinuation { continuation in
             self.getAvatarCustomizationOptions(token, type: type, subType: subType, currentImageID: currentImageID, shouldGetPossibleOptions: shouldGetPossibleOptions) { error, results in
@@ -2285,7 +2328,7 @@ public class SwiftRant {
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
     /// - parameter rantID: The ID of the rant to vote on.
     /// - parameter vote: The vote state. 1 = upvote, 0 = neutral, -1 = downvote.
-    /// - returns: A tuple that contains an error message in a ``String`` and the updated rant as a ``Rant``. If the request was successful, the `String?` in the tuple will contain `nil`, and the ``Rant`` in the tuple will hold the target rant with updated information. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the ``Rant`` in the tuple will contain `nil`.
+    /// - returns: A tuple that contains an error message in a `String` and the updated rant as a ``Rant``. If the request was successful, the `String?` in the tuple will contain `nil`, and the ``Rant`` in the tuple will hold the target rant with updated information. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the ``Rant`` in the tuple will contain `nil`.
     public func voteOnRant(_ token: UserCredentials?, rantID: Int, vote: Int) async -> (String?, Rant?) {
         return await withCheckedContinuation { continuation in
             self.voteOnRant(token, rantID: rantID, vote: vote) { error, updatedRant in
@@ -2299,7 +2342,7 @@ public class SwiftRant {
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
     /// - parameter commentID: The ID of the comment to vote on.
     /// - parameter vote: The vote state. 1 = upvote, 0 = neutral, -1 = downvote.
-    /// - returns: A tuple that contains an error message in a ``String`` and the updated comment as a ``Comment``. If the request was successful, the `String` in the tuple will contain `nil`, and the ``Comment`` in the tuple will hold the target comment with updated information. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the ``Comment`` in the tuple will contain `nil`.
+    /// - returns: A tuple that contains an error message in a `String` and the updated comment as a ``Comment``. If the request was successful, the `String` in the tuple will contain `nil`, and the ``Comment`` in the tuple will hold the target comment with updated information. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the ``Comment`` in the tuple will contain `nil`.
     public func voteOnComment(_ token: UserCredentials?, commentID id: Int, vote: Int) async -> (String?, Comment?) {
         return await withCheckedContinuation { continuation in
             self.voteOnComment(token, commentID: id, vote: vote) { error, updatedComment in
@@ -2316,7 +2359,7 @@ public class SwiftRant {
     /// - parameter githubLink: The user's GitHub link.
     /// - parameter location: The user's location.
     /// - parameter website: The user's personal website.
-    /// - returns: An error message in a ``String``.  If the request was successful, the `String?` will contain `nil`. If the request was unsuccessful, the `String?` will hold an error message.
+    /// - returns: An error message in a `String`.  If the request was successful, the `String?` will contain `nil`. If the request was unsuccessful, the `String?` will hold an error message.
     public func editProfileDetails(_ token: UserCredentials?, aboutSection: String?, skills: String?, githubLink: String?, location: String?, website: String?) async -> String? {
         return await withCheckedContinuation { continuation in
             self.editProfileDetails(token, aboutSection: aboutSection, skills: skills, githubLink: githubLink, location: location, website: website) { error in
@@ -2334,7 +2377,7 @@ public class SwiftRant {
     /// - parameter content: The text content of the post.
     /// - parameter tags: The post's associated tags.
     /// - parameter image: An image to attach to the post.
-    /// - returns: A tuple that contains an error message in a ``String`` and the ID of the post in an ``Int``. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Int?` in the tuple will contain the ID of the post. If the the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Int?` in the tuple will contain `nil`.
+    /// - returns: A tuple that contains an error message in a `String` and the ID of the post in an `Int`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Int?` in the tuple will contain the ID of the post. If the the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Int?` in the tuple will contain `nil`.
     public func postRant(_ token: UserCredentials?, postType: Rant.RantType, content: String, tags: String?, image: UIImage?) async -> (String?, Int?) {
         return await withCheckedContinuation { continuation in
             self.postRant(token, postType: postType, content: content, tags: tags, image: image) { error, rantID in
@@ -2350,7 +2393,7 @@ public class SwiftRant {
     /// - parameter content: The text content of the post.
     /// - parameter tags: The post's associated tags.
     /// - parameter image: An image to attach to the post.
-    /// - returns: A tuple that contains an error message in a ``String`` and the ID of the post in an ``Int``. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Int?` in the tuple will contain the ID of the post. If the the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Int?` in the tuple will contain `nil`.
+    /// - returns: A tuple that contains an error message in a `String` and the ID of the post in an `Int`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Int?` in the tuple will contain the ID of the post. If the the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Int?` in the tuple will contain `nil`.
     public func postRant(_ token: UserCredentials?, postType: Rant.RantType, content: String, tags: String?, image: NSImage?) async -> (String?, Int?) {
         return await withCheckedContinuation { continuation in
             self.postRant(token, postType: postType, content: content, tags: tags, image: image) { error, rantID in
@@ -2364,7 +2407,7 @@ public class SwiftRant {
     ///
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
     /// - parameter rantID: The ID of the post or rant to be deleted.
-    /// - returns: A tuple that contains an error message in a ``String`` and whether or not the request succeeded in a ``Bool``. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If he request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
+    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If he request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
     public func deleteRant(_ token: UserCredentials?, rantID: Int) async -> (String?, Bool) {
         return await withCheckedContinuation { continuation in
             self.deleteRant(token, rantID: rantID) { error, success in
@@ -2377,7 +2420,7 @@ public class SwiftRant {
     ///
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
     /// - parameter rantID: The ID of the post or rant to be marked as favorite.
-    /// - returns: A tuple that contains an error in a ``String`` and whether or not the request succeeded in a ``Bool``. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful. the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
+    /// - returns: A tuple that contains an error in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful. the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
     public func favoriteRant(_ token: UserCredentials?, rantID: Int) async -> (String?, Bool) {
         return await withCheckedContinuation { continuation in
             self.favoriteRant(token, rantID: rantID) { error, success in
@@ -2390,7 +2433,7 @@ public class SwiftRant {
     ///
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
     /// - parameter rantID: The ID of the post or rant to be unmarked as favorite.
-    /// - returns: A tuple that contains an error message in a ``String`` and whether or not the request succeeded in a ``Bool``. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful. the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
+    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful. the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
     public func unfavoriteRant(_ token: UserCredentials?, rantID: Int) async -> (String?, Bool) {
         return await withCheckedContinuation { continuation in
             self.unfavoriteRant(token, rantID: rantID) { error, success in
@@ -2408,7 +2451,7 @@ public class SwiftRant {
     /// - parameter content: The new text content of the post.
     /// - parameter tags: The post's new associated tags.
     /// - parameter image: A new image to attach to the post.
-    /// - returns: A tuple that contains an error message in a ``String`` and whether or not the request succeeded in a ``Bool``. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
+    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
     public func editRant(_ token: UserCredentials?, rantID: Int, postType: Rant.RantType, content: String, tags: String?, image: UIImage?) async -> (String?, Bool) {
         return await withCheckedContinuation { continuation in
             self.editRant(token, rantID: rantID, postType: postType, content: content, tags: tags, image: image) { error, success in
@@ -2425,7 +2468,7 @@ public class SwiftRant {
     /// - parameter content: The new text content of the post.
     /// - parameter tags: The post's new associated tags.
     /// - parameter image: A new image to attach to the post.
-    /// - returns: A tuple that contains an error message in a ``String`` and whether or not the request succeeded in a ``Bool``. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
+    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
     public func editRant(_ token: UserCredentials?, rantID: Int, postType: Rant.RantType, content: String, tags: String?, image: NSImage?) async -> (String?, Bool) {
         return await withCheckedContinuation { continuation in
             self.editRant(token, rantID: rantID, postType: postType, content: content, tags: tags, image: image) { error, success in
@@ -2442,7 +2485,7 @@ public class SwiftRant {
     /// - parameter rantID: The ID of the rant to post a comment under.
     /// - parameter content: The text content of the comment.
     /// - parameter image: An image to attach to the comment.
-    /// - returns: A tuple that contains an error message in a ``String`` and whether or not the request succeeded in a ``Bool``. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
+    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
     public func postComment(_ token: UserCredentials?, rantID: Int, content: String, image: UIImage?) async -> (String?, Bool) {
         return await withCheckedContinuation { continuation in
             self.postComment(token, rantID: rantID, content: content, image: image) { error, success in
@@ -2457,7 +2500,7 @@ public class SwiftRant {
     /// - parameter rantID: The ID of the rant to post a comment under.
     /// - parameter content: The text content of the comment.
     /// - parameter image: An image to attach to the comment.
-    /// - returns: A tuple that contains an error message in a ``String`` and whether or not the request succeeded in a ``Bool``. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
+    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
     public func postComment(_ token: UserCredentials?, rantID: Int, content: String, image: NSImage?) async -> (String?, Bool) {
         return await withCheckedContinuation { continuation in
             self.postComment(token, rantID: rantID, content: content, image: image) { error, success in
@@ -2474,7 +2517,7 @@ public class SwiftRant {
     /// - parameter commentID: The ID of the comment to be edited.
     /// - parameter content: The new text content of the comment.
     /// - parameter image: A new image to attach to the comment.
-    /// - parameter completionHandler: A tuple that contains an error message in a ``String`` and whether or not the request succeeded in a ``Bool``. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
+    /// - parameter completionHandler: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
     public func editComment(_ token: UserCredentials?, commentID: Int, content: String, image: UIImage?) async -> (String?, Bool) {
         return await withCheckedContinuation { continuation in
             self.editComment(token, commentID: commentID, content: content, image: image) { error, success in
@@ -2489,7 +2532,7 @@ public class SwiftRant {
     /// - parameter commentID: The ID of the comment to be edited.
     /// - parameter content: The new text content of the comment.
     /// - parameter image: A new image to attach to the comment.
-    /// - parameter completionHandler: A tuple that contains an error message in a ``String`` and whether or not the request succeeded in a ``Bool``. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
+    /// - parameter completionHandler: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
     public func editComment(_ token: UserCredentials?, commentID: Int, content: String, image: NSImage?) async -> (String?, Bool) {
         return await withCheckedContinuation { continuation in
             self.editComment(token, commentID: commentID, content: content, image: image) { error, success in
@@ -2503,7 +2546,7 @@ public class SwiftRant {
     ///
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
     /// - parameter commentID: The ID of the comment to be deleted.
-    /// - returns: A tuple that contains an error message in a ``String`` and whether or not the request succeeded in a ``Bool``. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
+    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
     public func deleteComment(_ token: UserCredentials?, commentID: Int) async -> (String?, Bool) {
         return await withCheckedContinuation { continuation in
             self.deleteComment(token, commentID: commentID) { error, success in
@@ -2516,7 +2559,7 @@ public class SwiftRant {
     ///
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
     /// - parameter fullImageID: The ID of the new avatar image (a file name with the extension of .png).
-    /// - returns: A tuple that contains an error message in a ``String`` and whether or not the request succeeded in a ``Bool`` If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
+    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool` If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
     public func confirmAvatarCustomization(_ token: UserCredentials?, fullImageID: String) async -> (String?, Bool) {
         return await withCheckedContinuation { continuation in
             self.confirmAvatarCustomization(token, fullImageID: fullImageID) { error, success in
@@ -2528,7 +2571,7 @@ public class SwiftRant {
     /// Marks all unread notifications as read.
     ///
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - returns: A tuple that contains an error message in a ``String`` and whether or not the request succeeded in a ``Bool``. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
+    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
     public func clearNotifications(_ token: UserCredentials?) async -> (String?, Bool) {
         return await withCheckedContinuation { continuation in
             self.clearNotifications(token) { error, success in

@@ -156,7 +156,7 @@ final class SwiftRantTests: XCTestCase {
         SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
             XCTAssertNil(error)
             
-            SwiftRant.shared.getRantFromID(token: nil, id: 5054220, lastCommentID: nil) { error, rant, comments in
+            SwiftRant.shared.getRantFromID(token: nil, id: 5055500, lastCommentID: nil) { error, rant, comments in
                 XCTAssertNil(error)
                 XCTAssertNotNil(rant)
                 XCTAssertNotNil(comments)
@@ -1111,6 +1111,43 @@ Before panicking, please make sure that:
                         }
                     }
                 }
+                
+                semaphore.signal()
+            }
+        }
+        
+        semaphore.wait()
+        
+        let query: [String:Any] = [kSecClass as String: kSecClassGenericPassword,
+                                   kSecMatchLimit as String: kSecMatchLimitOne,
+                                   kSecReturnAttributes as String: true,
+                                   kSecReturnData as String: true,
+                                   kSecAttrLabel as String: "SwiftRant-Attached Account" as CFString
+        ]
+        
+        keychainWrapper.removeAllKeys()
+        UserDefaults.resetStandardUserDefaults()
+        SecItemDelete(query as CFDictionary)
+    }
+    
+    func testSubscribedFeed() throws {
+        let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
+        
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        print("Enter your real username: ", terminator: "")
+        let username = readLine()
+        
+        print("Enter your real password: ", terminator: "")
+        let password = readLine()
+        
+        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
+            XCTAssertNil(error)
+            
+            SwiftRant.shared.getSubscribedFeed(nil, lastEndCursor: nil) { error, feed in
+                XCTAssertNil(error)
+                
+                print("BREAKPOINT")
                 
                 semaphore.signal()
             }
