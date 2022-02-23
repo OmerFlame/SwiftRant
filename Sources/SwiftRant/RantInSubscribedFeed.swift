@@ -161,7 +161,7 @@ public struct RantInSubscribedFeed: Decodable {
     /// * `0` = Unvoted
     /// * `-1` = Downvote
     /// * `-2` = Voting disabled (the rant belongs to the user whose token was used to fetch the rant)
-    public let voteState: Int
+    public var voteState: Int
     
     /// Whether or not the rant was edited in the past.
     public let isEdited: Bool
