@@ -102,7 +102,7 @@ public struct Rant: Decodable, Identifiable {
     }
 
     /// Holds information about a user's avatar.
-    public struct UserAvatar: Decodable {
+    public struct UserAvatar: Decodable, Equatable {
         
         /// The user's background color, in hex.
         public let backgroundColor: String

@@ -70,7 +70,7 @@ public struct SubscribedFeed: Decodable {
         /// A structure representing a single user in the username map.
         public struct User: Decodable, Hashable {
             public static func == (lhs: SubscribedFeed.UsernameMap.User, rhs: SubscribedFeed.UsernameMap.User) -> Bool {
-                fatalError("Do not use this function! It is created strictly for conforming to the Hashable protocol.")
+                return lhs.username == rhs.username && lhs.avatar == rhs.avatar && lhs.score == rhs.score && lhs.userID == rhs.userID
             }
             
             public func hash(into hasher: inout Hasher) {
