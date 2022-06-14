@@ -235,17 +235,30 @@ public class SwiftRant {
     public func getRantFeed(token: UserCredentials?, skip: Int, prevSet: String?, completionHandler: @escaping ((String?, RantFeed?) -> Void)) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                //fatalError("No token was specified!")
+                
+                completionHandler("No devRant access token was specified!", nil)
+                return
             }
         } else {
             let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler("Could not find devRant access token in Keychain during token validation!", nil)
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain!, password: usernameFromKeychain!) { error, _ in
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler("Could not find devRant username/password in Keychain before renewing the token!", nil)
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { error, _ in
                     if error != nil {
                         errorMessage = error
                         loginSemaphore.signal()
@@ -263,19 +276,39 @@ public class SwiftRant {
             }
         }
         
-        var resourceURL: URL {
+        let currentToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
+        
+        var resourceURL: URL!
+        
+        if shouldUseKeychainAndUserDefaults {
+            guard let currentToken = currentToken else {
+                completionHandler("Failed to get devRant access token from Keychain while building request URL!", nil)
+                return
+            }
+            
+            if UserDefaults.standard.string(forKey: "DRLastSet") != nil {
+                resourceURL = URL(string: baseURL + "/devrant/rants?limit=20&skip=\(String(skip))&sort=algo&prev_set=\(String(UserDefaults.standard.string(forKey: "DRLastSet")!))&app=3&plat=1&nari=1&user_id=\(String(currentToken.authToken.userID))&token_id=\(String(currentToken.authToken.tokenID))&token_key=\(currentToken.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+            } else {
+                resourceURL = URL(string: baseURL + "/devrant/rants?limit=20&skip=\(String(skip))&sort=algo&app=3&plat=1&nari=1&user_id=\(String(currentToken.authToken.userID))&token_id=\(String(currentToken.authToken.tokenID))&token_key=\(currentToken.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+            }
+        } else {
+            resourceURL = URL(string: baseURL + "/devrant/rants?limit=20&skip=\(String(skip))&sort=algo\(prevSet != nil ? "prev_set=\(prevSet!)" : "")&app=3&plat=1&nari=1&user_id=\(String(token!.authToken.userID))&token_id=\(String(token!.authToken.tokenID))&token_key=\(token!.authToken.tokenKey)")!
+        }
+        
+        
+        
+        /*var resourceURL: URL {
             if shouldUseKeychainAndUserDefaults {
                 if UserDefaults.standard.string(forKey: "DRLastSet") != nil {
-                    let currentToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
-                    return URL(string: baseURL + "/devrant/rants?limit=20&skip=\(String(skip))&sort=algo&prev_set=\(String(UserDefaults.standard.string(forKey: "DRLastSet")!))&app=3&plat=1&nari=1&user_id=\(String(currentToken!.authToken.userID))&token_id=\(String(currentToken!.authToken.tokenID))&token_key=\(currentToken!.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+                    
+                    return URL(string: baseURL + "/devrant/rants?limit=20&skip=\(String(skip))&sort=algo&prev_set=\(String(UserDefaults.standard.string(forKey: "DRLastSet")!))&app=3&plat=1&nari=1&user_id=\(String(currentToken.authToken.userID))&token_id=\(String(currentToken.authToken.tokenID))&token_key=\(currentToken.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
                 } else {
-                    let currentToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
-                    return URL(string: baseURL + "/devrant/rants?limit=20&skip=\(String(skip))&sort=algo&app=3&plat=1&nari=1&user_id=\(String(currentToken!.authToken.userID))&token_id=\(String(currentToken!.authToken.tokenID))&token_key=\(currentToken!.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+                    return URL(string: baseURL + "/devrant/rants?limit=20&skip=\(String(skip))&sort=algo&app=3&plat=1&nari=1&user_id=\(String(currentToken.authToken.userID))&token_id=\(String(currentToken.authToken.tokenID))&token_key=\(currentToken.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
                 }
             } else {
                 return URL(string: baseURL + "/devrant/rants?limit=20&skip=\(String(skip))&sort=algo\(prevSet != nil ? "prev_set=\(prevSet!)" : "")&app=3&plat=1&nari=1&user_id=\(String(token!.authToken.userID))&token_id=\(String(token!.authToken.tokenID))&token_key=\(token!.authToken.tokenKey)")!
             }
-        }
+        }*/
         
         var request = URLRequest(url: resourceURL)
         
@@ -338,7 +371,8 @@ public class SwiftRant {
     public func getNotificationFeed(token: UserCredentials?, lastCheckTime: Int?, shouldGetNewNotifs: Bool, category: Notifications.Categories, completionHandler: @escaping ((String?, Notifications?) -> Void)) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler("No devRant access token was specified!", nil)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -418,7 +452,8 @@ public class SwiftRant {
     public func getRantFromID(token: UserCredentials?, id: Int, lastCommentID: Int?, completionHandler: ((String?, Rant?, [Comment]?) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", nil, nil)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -493,7 +528,8 @@ public class SwiftRant {
     public func getCommentFromID(_ id: Int, token: UserCredentials?, completionHandler: ((String?, Comment?) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", nil)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -566,7 +602,8 @@ public class SwiftRant {
     public func getSubscribedFeed(_ token: UserCredentials?, lastEndCursor: String?, completionHandler: ((String?, SubscribedFeed?) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", nil)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -681,7 +718,8 @@ public class SwiftRant {
     public func getProfileFromID(_ id: Int, token: UserCredentials?, userContentType: Profile.ProfileContentTypes, skip: Int, completionHandler: ((String?, Profile?) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", nil)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -761,7 +799,8 @@ public class SwiftRant {
     public func getAvatarCustomizationOptions(_ token: UserCredentials?, type: String, subType: Int?, currentImageID: String, shouldGetPossibleOptions: Bool, completionHandler: ((String?, AvatarCustomizationResults?) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", nil)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -836,7 +875,8 @@ public class SwiftRant {
     public func voteOnRant(_ token: UserCredentials?, rantID id: Int, vote: Int, completionHandler: ((String?, Rant?) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", nil)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -915,7 +955,8 @@ public class SwiftRant {
     public func voteOnComment(_ token: UserCredentials?, commentID id: Int, vote: Int, completionHandler: ((String?, Comment?) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", nil)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -997,7 +1038,8 @@ public class SwiftRant {
     public func editProfileDetails(_ token: UserCredentials?, aboutSection: String?, skills: String?, githubLink: String?, location: String?, website: String?, completionHandler: ((String?) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!")
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -1072,7 +1114,8 @@ public class SwiftRant {
     public func postRant(_ token: UserCredentials?, postType: Rant.RantType, content: String, tags: String?, image: UIImage?, completionHandler: ((String?, Int?) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", nil)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -1163,7 +1206,8 @@ public class SwiftRant {
     public func postRant(_ token: UserCredentials?, postType: Rant.RantType, content: String, tags: String?, image: NSImage?, completionHandler: ((String?, Int?) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", nil)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -1252,7 +1296,8 @@ public class SwiftRant {
     public func deleteRant(_ token: UserCredentials?, rantID: Int, completionHandler: ((String?, Bool) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", false)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -1320,7 +1365,8 @@ public class SwiftRant {
     public func favoriteRant(_ token: UserCredentials?, rantID: Int, completionHandler: ((String?, Bool) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", false)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -1388,7 +1434,8 @@ public class SwiftRant {
     public func unfavoriteRant(_ token: UserCredentials?, rantID: Int, completionHandler: ((String?, Bool) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", false)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -1460,7 +1507,8 @@ public class SwiftRant {
     public func editRant(_ token: UserCredentials?, rantID: Int, postType: Rant.RantType, content: String, tags: String?, image: UIImage?, completionHandler: ((String?, Bool) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", nil)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -1552,7 +1600,8 @@ public class SwiftRant {
     public func editRant(_ token: UserCredentials?, rantID: Int, postType: Rant.RantType, content: String, tags: String?, image: NSImage?, completionHandler: ((String?, Bool) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", false)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -1644,7 +1693,8 @@ public class SwiftRant {
     public func postComment(_ token: UserCredentials?, rantID: Int, content: String, image: UIImage?, completionHandler: ((String?, Bool) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", nil)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -1733,7 +1783,8 @@ public class SwiftRant {
     public func postComment(_ token: UserCredentials?, rantID: Int, content: String, image: NSImage?, completionHandler: ((String?, Bool) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", false)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -1824,7 +1875,8 @@ public class SwiftRant {
     public func editComment(_ token: UserCredentials?, commentID: Int, content: String, image: UIImage?, completionHandler: ((String?, Bool) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", false)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -1911,7 +1963,8 @@ public class SwiftRant {
     public func editComment(_ token: UserCredentials?, commentID: Int, content: String, image: NSImage?, completionHandler: ((String?, Bool) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", false)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -1997,7 +2050,8 @@ public class SwiftRant {
     public func deleteComment(_ token: UserCredentials?, commentID: Int, completionHandler: ((String?, Bool) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", false)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -2065,7 +2119,8 @@ public class SwiftRant {
     public func confirmAvatarCustomization(_ token: UserCredentials?, fullImageID: String, completionHandler: ((String?, Bool) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", false)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -2134,7 +2189,8 @@ public class SwiftRant {
     public func clearNotifications(_ token: UserCredentials?, completionHandler: ((String?, Bool) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", false)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -2201,7 +2257,8 @@ public class SwiftRant {
     public func subscribeToUser(_ token: UserCredentials?, userID: Int, completionHandler: ((String?, Bool) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", false)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
@@ -2270,7 +2327,8 @@ public class SwiftRant {
     public func unsubscribeFromUser(_ token: UserCredentials?, userID: Int, completionHandler: ((String?, Bool) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                completionHandler?("No devRant access token was specified!", false)
+                return
             }
         } else {
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
