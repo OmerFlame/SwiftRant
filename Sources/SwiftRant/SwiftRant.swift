@@ -1507,7 +1507,7 @@ public class SwiftRant {
     public func editRant(_ token: UserCredentials?, rantID: Int, postType: Rant.RantType, content: String, tags: String?, image: UIImage?, completionHandler: ((String?, Bool) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", nil)
+                completionHandler?("No devRant access token was specified!", false)
                 return
             }
         } else {
@@ -1693,7 +1693,7 @@ public class SwiftRant {
     public func postComment(_ token: UserCredentials?, rantID: Int, content: String, image: UIImage?, completionHandler: ((String?, Bool) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", nil)
+                completionHandler?("No devRant access token was specified!", false)
                 return
             }
         } else {
