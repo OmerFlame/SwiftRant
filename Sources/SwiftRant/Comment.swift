@@ -91,7 +91,9 @@ public struct Comment: Decodable, Identifiable {
             }
         }
     }
-    
+}
+
+extension Comment {
     public init(decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(Int.self, forKey: .id)

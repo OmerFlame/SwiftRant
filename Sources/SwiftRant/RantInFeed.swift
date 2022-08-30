@@ -93,7 +93,9 @@ public struct RantInFeed: Decodable, Identifiable {
              userAvatarLarge = "user_avatar_lg",
              isUserDPP = "user_dpp"
     }
-    
+}
+
+extension RantInFeed {
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(Int.self, forKey: .id)

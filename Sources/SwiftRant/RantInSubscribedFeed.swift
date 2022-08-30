@@ -126,13 +126,6 @@ public struct RantInSubscribedFeed: Decodable {
         
         /// The action the user performed.
         public let action: UserAction
-        
-        public init(from decoder: Decoder) throws {
-            let values = try decoder.container(keyedBy: CodingKeys.self)
-            
-            userID = Int(try values.decode(String.self, forKey: .userID))!
-            action = UserAction(rawValue: try values.decode(String.self, forKey: .action))!
-        }
     }
     
     /// The rant's ID.
@@ -173,7 +166,9 @@ public struct RantInSubscribedFeed: Decodable {
         case rant
         case actions
     }
-    
+}
+
+extension RantInSubscribedFeed {
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         
@@ -201,5 +196,14 @@ public struct RantInSubscribedFeed: Decodable {
         isEdited = rantInFeedProperties["edited"]! as! Bool
         
         relatedUserActions = try values.decode([RelatedUserAction].self, forKey: .actions)
+    }
+}
+
+extension RantInSubscribedFeed.RelatedUserAction {
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: RantInSubscribedFeed.RelatedUserAction.CodingKeys.self)
+        
+        userID = Int(try values.decode(String.self, forKey: .userID))!
+        action = RantInSubscribedFeed.RelatedUserAction.UserAction(rawValue: try values.decode(String.self, forKey: .action))!
     }
 }

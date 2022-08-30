@@ -67,24 +67,6 @@ public struct Rant: Decodable, Identifiable {
                  start,
                  end
         }
-        
-        public init(from decoder: Decoder) throws {
-            let values = try decoder.container(keyedBy: CodingKeys.self)
-            
-            type = try values.decode(String.self, forKey: .type)
-            
-            do {
-                url = try values.decode(String.self, forKey: .url)
-            } catch {
-                url = try String(values.decode(Int.self, forKey: .url))
-            }
-            
-            //url = try values.decodeIfPresent(String.self, forKey: .url) ?? String(values.decode(Int.self, forKey: .url))
-            shortURL = try values.decodeIfPresent(String.self, forKey: .shortURL)
-            title = try values.decode(String.self, forKey: .title)
-            start = try values.decodeIfPresent(Int.self, forKey: .start)
-            end = try values.decodeIfPresent(Int.self, forKey: .end)
-        }
     }
 
     /// Holds information about attached images in rants and comments.
@@ -113,13 +95,6 @@ public struct Rant: Decodable, Identifiable {
         enum CodingKeys: String, CodingKey {
             case backgroundColor = "b",
                  avatarImage = "i"
-        }
-        
-        public init(from decoder: Decoder) throws {
-            let values = try decoder.container(keyedBy: CodingKeys.self)
-            
-            backgroundColor = try values.decode(String.self, forKey: .backgroundColor)
-            avatarImage = try? values.decode(String.self, forKey: .avatarImage)
         }
     }
     
@@ -231,6 +206,32 @@ public struct Rant: Decodable, Identifiable {
              isUserDPP = "user_dpp"
     }
     
+    /// An enumeration that represents the types of posts that exist.
+    public enum RantType: Int {
+        /// Represents a rant post type.
+        case rant = 1
+        
+        /// Represents a collab post type.
+        case collab = 2
+        
+        /// Represents a meme post type.
+        case meme = 3
+        
+        /// Represents a question post type.
+        case question = 4
+        
+        /// Represents a devRant-related post type.
+        case devRant = 5
+        
+        /// Represents a random topic post type.
+        case random = 6
+        
+        /// Represents an undefined post type (not available anymore in the official client).
+        case undefined = 7
+    }
+}
+
+extension Rant {
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         
@@ -286,28 +287,33 @@ public struct Rant: Decodable, Identifiable {
             }
         }
     }
-    
-    /// An enumeration that represents the types of posts that exist.
-    public enum RantType: Int {
-        /// Represents a rant post type.
-        case rant = 1
+}
+
+extension Rant.Link {
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
         
-        /// Represents a collab post type.
-        case collab = 2
+        type = try values.decode(String.self, forKey: .type)
         
-        /// Represents a meme post type.
-        case meme = 3
+        do {
+            url = try values.decode(String.self, forKey: .url)
+        } catch {
+            url = try String(values.decode(Int.self, forKey: .url))
+        }
         
-        /// Represents a question post type.
-        case question = 4
+        //url = try values.decodeIfPresent(String.self, forKey: .url) ?? String(values.decode(Int.self, forKey: .url))
+        shortURL = try values.decodeIfPresent(String.self, forKey: .shortURL)
+        title = try values.decode(String.self, forKey: .title)
+        start = try values.decodeIfPresent(Int.self, forKey: .start)
+        end = try values.decodeIfPresent(Int.self, forKey: .end)
+    }
+}
+
+extension Rant.UserAvatar {
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
         
-        /// Represents a devRant-related post type.
-        case devRant = 5
-        
-        /// Represents a random topic post type.
-        case random = 6
-        
-        /// Represents an undefined post type (not available anymore in the official client).
-        case undefined = 7
+        backgroundColor = try values.decode(String.self, forKey: .backgroundColor)
+        avatarImage = try? values.decode(String.self, forKey: .avatarImage)
     }
 }

@@ -63,7 +63,9 @@ public struct Notifications: Decodable {
         case unread
         case usernameMap = "username_map"
     }
-    
+}
+
+extension Notifications {
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         
@@ -107,6 +109,18 @@ public struct Notification: Decodable, Equatable {
         case uid
     }
     
+    public static func == (lhs: Notification, rhs: Notification) -> Bool {
+        return
+            lhs.commentID == rhs.commentID &&
+            lhs.createdTime == rhs.createdTime &&
+            lhs.rantID == rhs.rantID &&
+            lhs.read == rhs.read &&
+            lhs.type == rhs.type &&
+            lhs.uid == rhs.uid
+    }
+}
+
+extension Notification {
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         
@@ -116,16 +130,6 @@ public struct Notification: Decodable, Equatable {
         read = try values.decode(Int.self, forKey: .read)
         type = try values.decode(NotificationType.self, forKey: .type)
         uid = try values.decode(Int.self, forKey: .uid)
-    }
-    
-    public static func == (lhs: Notification, rhs: Notification) -> Bool {
-        return
-            lhs.commentID == rhs.commentID &&
-            lhs.createdTime == rhs.createdTime &&
-            lhs.rantID == rhs.rantID &&
-            lhs.read == rhs.read &&
-            lhs.type == rhs.type &&
-            lhs.uid == rhs.uid
     }
 }
 

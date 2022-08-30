@@ -23,13 +23,6 @@ public struct RantFeed: Decodable {
             case notificationState = "notif_state"
             case notificationToken = "notif_token"
         }
-        
-        public init(from decoder: Decoder) throws {
-            let values = try decoder.container(keyedBy: CodingKeys.self)
-            
-            notificationState = try values.decode(String.self, forKey: .notificationState)
-            notificationToken = try? values.decode(String.self, forKey: .notificationToken)
-        }
     }
     
     /// Contains the amount of unread notifications.
@@ -107,7 +100,9 @@ public struct RantFeed: Decodable {
         case unread
         case news
     }
-    
+}
+
+extension RantFeed {
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         
@@ -119,5 +114,14 @@ public struct RantFeed: Decodable {
         notifCount = try values.decode(Int.self, forKey: .notifCount)
         unread = try values.decode(Unread.self, forKey: .unread)
         news = try values.decodeIfPresent(News.self, forKey: .news)
+    }
+}
+
+extension RantFeed.Settings {
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        
+        notificationState = try values.decode(String.self, forKey: .notificationState)
+        notificationToken = try? values.decode(String.self, forKey: .notificationToken)
     }
 }
