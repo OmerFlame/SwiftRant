@@ -37,7 +37,23 @@ public struct RantInFeed: Decodable, Identifiable {
     /// * `0` = Unvoted
     /// * `-1` = Downvote
     /// * `-2` = Voting disabled (the rant belongs to the user whose token was used to fetch the rant)
-    public var voteState: Int
+    public var voteStateRaw: Int
+    
+    public enum VoteState: Int {
+        case upvoted = 1
+        case unvoted = 0
+        case downvoted = -1
+        case unvotable = -2
+    }
+    
+    public var voteState: VoteState {
+        get {
+            return VoteState(rawValue: voteStateRaw) ?? .unvotable
+        }
+        set {
+            voteStateRaw = newValue.rawValue
+        }
+    }
     
     /// Whether or not the rant was edited in the past.
     public let isEdited: Bool
@@ -111,7 +127,7 @@ extension RantInFeed {
         
         commentCount = try values.decode(Int.self, forKey: .commentCount)
         tags = try values.decode([String].self, forKey: .tags)
-        voteState = try values.decode(Int.self, forKey: .voteState)
+        voteStateRaw = try values.decode(Int.self, forKey: .voteState)
         isEdited = try values.decode(Bool.self, forKey: .isEdited)
         link = try? values.decode(String.self, forKey: .link)
         collabType = try? values.decode(Int.self, forKey: .collabType)
