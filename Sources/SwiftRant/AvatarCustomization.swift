@@ -186,20 +186,6 @@ public struct AvatarCustomizationResults: Decodable {
             case subType = "sub_type"
             case forGender = "for_gender"
         }
-        
-        public init(from decoder: Decoder) throws {
-            let values = try decoder.container(keyedBy: CodingKeys.self)
-            
-            do {
-                id = try values.decode(String.self, forKey: .id)
-            } catch {
-                id = try String(values.decode(Int.self, forKey: .id))
-            }
-            
-            label = try values.decode(String.self, forKey: .label)
-            subType = try values.decodeIfPresent(Int.self, forKey: .subType)
-            forGender = try values.decodeIfPresent(String.self, forKey: .forGender)
-        }
     }
     
     /// A model representing an avatar customization option.
@@ -227,16 +213,6 @@ public struct AvatarCustomizationResults: Decodable {
             case requiredPoints = "points"
             case isSelected = "selected"
         }
-        
-        public init(from decoder: Decoder) throws {
-            let values = try decoder.container(keyedBy: CodingKeys.self)
-            
-            backgroundColor = try values.decodeIfPresent(String.self, forKey: .backgroundColor)
-            id = try values.decodeIfPresent(String.self, forKey: .id)
-            image = try values.decode(AvatarCustomizationImage.self, forKey: .image)
-            requiredPoints = try values.decodeIfPresent(Int.self, forKey: .requiredPoints)
-            isSelected = try values.decodeIfPresent(Bool.self, forKey: .isSelected)
-        }
     }
     
     /// The customization options given for the requested type.
@@ -254,7 +230,9 @@ public struct AvatarCustomizationResults: Decodable {
         case userInfo = "me"
         case types = "options"
     }
-    
+}
+
+extension AvatarCustomizationResults {
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         
@@ -262,5 +240,33 @@ public struct AvatarCustomizationResults: Decodable {
         
         userInfo = try values.decode(AvatarCustomizationCurrentUserInfo.self, forKey: .userInfo)
         types = try values.decodeIfPresent([AvatarCustomizationType].self, forKey: .types)
+    }
+}
+
+extension AvatarCustomizationResults.AvatarCustomizationType {
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        
+        do {
+            id = try values.decode(String.self, forKey: .id)
+        } catch {
+            id = try String(values.decode(Int.self, forKey: .id))
+        }
+        
+        label = try values.decode(String.self, forKey: .label)
+        subType = try values.decodeIfPresent(Int.self, forKey: .subType)
+        forGender = try values.decodeIfPresent(String.self, forKey: .forGender)
+    }
+}
+
+extension AvatarCustomizationResults.AvatarCustomizationOption {
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        
+        backgroundColor = try values.decodeIfPresent(String.self, forKey: .backgroundColor)
+        id = try values.decodeIfPresent(String.self, forKey: .id)
+        image = try values.decode(AvatarCustomizationResults.AvatarCustomizationImage.self, forKey: .image)
+        requiredPoints = try values.decodeIfPresent(Int.self, forKey: .requiredPoints)
+        isSelected = try values.decodeIfPresent(Bool.self, forKey: .isSelected)
     }
 }

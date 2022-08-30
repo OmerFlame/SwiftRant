@@ -22,13 +22,6 @@ public struct SubscribedFeed: Decodable {
             case endCursor = "end_cursor"
             case hasNextPage = "has_next_page"
         }
-        
-        public init(from decoder: Decoder) throws {
-            let values = try decoder.container(keyedBy: CodingKeys.self)
-            
-            endCursor = try values.decode(String.self, forKey: .endCursor)
-            hasNextPage = try values.decode(Bool.self, forKey: .hasNextPage)
-        }
     }
     
     /// A structure representing the list of users the devRant API thinks it can recommend to the user.
@@ -44,22 +37,6 @@ public struct SubscribedFeed: Decodable {
         private enum CodingKeys: String, CodingKey {
             case items
             case hasNextPage = "has_next_page"
-        }
-        
-        public init(from decoder: Decoder) throws {
-            let values = try decoder.container(keyedBy: CodingKeys.self)
-            
-            let decodedItemsArray = try values.decode(Array<Any>.self, forKey: .items) as! Array<Dictionary<String, Int>>
-            
-            var tempUsers = [Int]()
-            
-            for item in decodedItemsArray {
-                tempUsers.append(item["uid"]!)
-            }
-            
-            users = tempUsers
-            
-            hasNextPage = try values.decode(Bool.self, forKey: .hasNextPage)
         }
     }
     
@@ -96,16 +73,6 @@ public struct SubscribedFeed: Decodable {
                 case avatar
                 case score
             }
-            
-            public init(from decoder: Decoder) throws {
-                let values = try decoder.container(keyedBy: CodingKeys.self)
-                
-                username = try values.decode(String.self, forKey: .username)
-                avatar = try values.decode(Rant.UserAvatar.self, forKey: .avatar)
-                score = try values.decode(Int.self, forKey: .score)
-                
-                userID = Int(values.codingPath[values.codingPath.endIndex - 1].stringValue)!
-            }
         }
         
         /// The array of the users.
@@ -124,19 +91,6 @@ public struct SubscribedFeed: Decodable {
                 return nil
             }
         }
-        
-        public init(from decoder: Decoder) throws {
-            let values = try decoder.container(keyedBy: DynamicCodingKeys.self)
-            
-            var tempArray = [User]()
-            
-            for key in values.allKeys {
-                let decodedObject = try values.decode(User.self, forKey: DynamicCodingKeys(stringValue: key.stringValue)!)
-                tempArray.append(decodedObject)
-            }
-            
-            users = tempArray
-        }
     }
     
     /// The rants in the feed.
@@ -154,7 +108,9 @@ public struct SubscribedFeed: Decodable {
     private enum CodingKeys: String, CodingKey {
         case feed
     }
-    
+}
+
+extension SubscribedFeed {
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         
@@ -191,5 +147,59 @@ public struct SubscribedFeed: Decodable {
         let usernameMapData = try JSONSerialization.data(withJSONObject: usernameMapDict, options: [])
         
         usernameMap = try JSONDecoder().decode(UsernameMap.self, from: usernameMapData)
+    }
+}
+
+extension SubscribedFeed.PageInfo {
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        
+        endCursor = try values.decode(String.self, forKey: .endCursor)
+        hasNextPage = try values.decode(Bool.self, forKey: .hasNextPage)
+    }
+}
+
+extension SubscribedFeed.RecommendedUsers {
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        
+        let decodedItemsArray = try values.decode(Array<Any>.self, forKey: .items) as! Array<Dictionary<String, Int>>
+        
+        var tempUsers = [Int]()
+        
+        for item in decodedItemsArray {
+            tempUsers.append(item["uid"]!)
+        }
+        
+        users = tempUsers
+        
+        hasNextPage = try values.decode(Bool.self, forKey: .hasNextPage)
+    }
+}
+
+extension SubscribedFeed.UsernameMap {
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: DynamicCodingKeys.self)
+        
+        var tempArray = [User]()
+        
+        for key in values.allKeys {
+            let decodedObject = try values.decode(User.self, forKey: DynamicCodingKeys(stringValue: key.stringValue)!)
+            tempArray.append(decodedObject)
+        }
+        
+        users = tempArray
+    }
+}
+
+extension SubscribedFeed.UsernameMap.User {
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        
+        username = try values.decode(String.self, forKey: .username)
+        avatar = try values.decode(Rant.UserAvatar.self, forKey: .avatar)
+        score = try values.decode(Int.self, forKey: .score)
+        
+        userID = Int(values.codingPath[values.codingPath.endIndex - 1].stringValue)!
     }
 }
