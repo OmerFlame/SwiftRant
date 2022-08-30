@@ -226,6 +226,23 @@ public class SwiftRant {
         }.resume()
     }
     
+    /// Removes the user credentials login token from the keychain.
+    public func logOut() {
+        let keychainWrapper = KeychainWrapper(
+            serviceName: "SwiftRant",
+            accessGroup: "SwiftRantAccessGroup"
+        )
+        
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecReturnAttributes as String: true,
+            kSecReturnData as String: true,
+        ]
+        
+        keychainWrapper.removeAllKeys()
+        SecItemDelete(query as CFDictionary)
+    }
+    
     /// Gets a personalized rant feed for the user.
     ///
     /// - parameter token: The user's token. set to `nil`if the SwiftRant instance was configured to use the Keychain and User Defaults.
