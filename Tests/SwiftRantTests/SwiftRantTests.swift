@@ -142,6 +142,60 @@ final class SwiftRantTests: XCTestCase {
         SecItemDelete(query as CFDictionary)
     }
     
+    func testWeeklyList() throws {
+        let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
+        
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        print("Print your real username: ", terminator: "")
+        let username = readLine()
+        
+        print("Print your real password: ", terminator: "")
+        let password = readLine()
+        
+        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
+            XCTAssertNil(error)
+            
+            SwiftRant.shared.getWeekList(token: nil) { error, list in
+                XCTAssertNotNil(list)
+                XCTAssertNil(error)
+                
+                semaphore.signal()
+            }
+        }
+        
+        semaphore.wait()
+        
+        SwiftRant.shared.logOut()
+    }
+    
+    func testWeeklyRantFeed() throws {
+        let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
+        
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        print("Print your real username: ", terminator: "")
+        let username = readLine()
+        
+        print("Print your real password: ", terminator: "")
+        let password = readLine()
+        
+        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
+            XCTAssertNil(error)
+            
+            SwiftRant.shared.getWeeklyRants(token: nil, skip: 0, week: 329) { error, feed in
+                XCTAssertNil(error)
+                XCTAssertNotNil(feed)
+                
+                semaphore.signal()
+            }
+        }
+        
+        semaphore.wait()
+        
+        SwiftRant.shared.logOut()
+    }
+    
     func testRantFromID() throws {
         let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
         

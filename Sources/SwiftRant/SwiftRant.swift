@@ -248,7 +248,7 @@ public class SwiftRant {
     /// - parameter token: The user's token. set to `nil`if the SwiftRant instance was configured to use the Keychain and User Defaults.
     /// - parameter skip: How many rants to skip before loading. Used for pagination/infinite scroll.
     /// - parameter prevSet: The ``RantFeed/set`` you got in the last fetch. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults, the SwiftRant instance will get the set from the last fetch from User Defaults.
-    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch is successful, the ``RantFeed`` parameter will hold the actual auth token info, while the `String` is `nil`. If the fetch is unsuccessful, then the `String` will hold an error message, while the ``RantFeed`` will be `nil`.
+    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch is successful, the ``RantFeed`` parameter will contain the feed, while the `String` is `nil`. If the fetch is unsuccessful, then the `String` will hold an error message, while the ``RantFeed`` will be `nil`.
     public func getRantFeed(token: UserCredentials?, skip: Int, prevSet: String?, completionHandler: @escaping ((String?, RantFeed?) -> Void)) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
@@ -375,6 +375,152 @@ public class SwiftRant {
                 completionHandler("An unknown error has occurred.", nil)
                 return
             }
+        }.resume()
+    }
+    
+    /// Get a specific week's Weekly Rant Week rant feed.
+    ///
+    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    /// - parameter limit: The maximum amount of rants to provide in the response. Default is 20.
+    /// - parameter skip: How many rants to skip before loading. Used for pagination/infinite scroll.
+    /// - parameter week: The week number to fetch.
+    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch is successful, the ``RantFeed`` parameter will contain the feed, while the `String` is `nil`. If the fetch is unsuccessful, then the `String` will hold an error message, while the ``RantFeed`` will be `nil`.
+    public func getWeeklyRants(token: UserCredentials?, limit: Int = 20, skip: Int, week: Int, completionHandler: @escaping ((String?, RantFeed?) -> Void)) {
+        if !shouldUseKeychainAndUserDefaults {
+            guard token != nil else {
+                fatalError("No token was specified!")
+            }
+        } else {
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
+            
+            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+                let loginSemaphore = DispatchSemaphore(value: 0)
+                
+                var errorMessage: String?
+                
+                logIn(username: usernameFromKeychain!, password: usernameFromKeychain!) { error, _ in
+                    if error != nil {
+                        errorMessage = error
+                        loginSemaphore.signal()
+                        return
+                    }
+                    
+                    loginSemaphore.signal()
+                }
+                
+                loginSemaphore.wait()
+                
+                if errorMessage != nil {
+                    completionHandler(errorMessage, nil)
+                }
+            }
+        }
+        
+        let resourceURL = URL(string: baseURL + "/devrant/weekly-rants?limit=\(limit)&skip=\(skip)&sort=algo&week=\(week)&hide_reposts=0&app=3&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+        
+        var request = URLRequest(url: resourceURL)
+        request.httpMethod = "GET"
+        request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        
+        let session = URLSession(configuration: .default)
+        
+        session.dataTask(with: request) { data, response, error in
+            if let data = data {
+                let decoder = JSONDecoder()
+                
+                let rantFeed = try? decoder.decode(RantFeed.self, from: data)
+                
+                if rantFeed == nil {
+                    let jsonObject = try? JSONSerialization.jsonObject(with: data)
+                    
+                    if let jsonObject = jsonObject {
+                        if let jObject = jsonObject as? [String:Any] {
+                            if let error = jObject["error"] as? String {
+                                completionHandler(error, nil)
+                                return
+                            }
+                        }
+                    }
+                } else {
+                    completionHandler(nil, rantFeed)
+                    return
+                }
+            }
+            
+            completionHandler("An unknown error has occurred.", nil)
+            return
+        }.resume()
+    }
+    
+    /// Get the list of Weekly Rant weeks.
+    ///
+    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch was successful, the ``WeeklyList`` parameter will hold the list of weeks, while the `String` is `nil`. If the fetch was unsuccessful, then the `String` will hold an error message, while the ``WeeklyList`` will be `nil`.
+    public func getWeekList(token: UserCredentials?, completionHandler: @escaping ((String?, WeeklyList?) -> Void)) {
+        if !shouldUseKeychainAndUserDefaults {
+            guard token != nil else {
+                completionHandler("No devRant access token was specified!", nil)
+                return
+            }
+        } else {
+            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            
+            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+                let loginSemaphore = DispatchSemaphore(value: 0)
+                
+                var errorMessage: String?
+                
+                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
+                    if error != nil {
+                        errorMessage = error
+                        loginSemaphore.signal()
+                        return
+                    }
+                    
+                    loginSemaphore.signal()
+                }
+                
+                loginSemaphore.wait()
+                
+                if errorMessage != nil {
+                    completionHandler(errorMessage, nil)
+                }
+            }
+        }
+        
+        let resourceURL = URL(string: baseURL + "/devrant/weekly-list?app=3&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+        
+        var request = URLRequest(url: resourceURL)
+        request.httpMethod = "GET"
+        request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        
+        let session = URLSession(configuration: .default)
+        
+        session.dataTask(with: request) { data, response, error in
+            if let data = data {
+                let decoder = JSONDecoder()
+                
+                let weekList = try? decoder.decode(WeeklyList.self, from: data)
+                
+                if weekList == nil {
+                    let jsonObject = try? JSONSerialization.jsonObject(with: data)
+                    
+                    if let jsonObject = jsonObject {
+                        if let jObject = jsonObject as? [String:Any] {
+                            if let error = jObject["error"] as? String {
+                                completionHandler(error, nil)
+                                return
+                            }
+                        }
+                    } else {
+                        completionHandler(nil, weekList)
+                        return
+                    }
+                }
+            }
+            
+            completionHandler("An unknown error has occurred.", nil)
+            return
         }.resume()
     }
     
@@ -2428,11 +2574,38 @@ public class SwiftRant {
     /// - parameter token: The user's token. set to `nil`if the SwiftRant instance was configured to use the Keychain and User Defaults.
     /// - parameter skip: How many rants to skip before loading. Used for pagination/infinite scroll.
     /// - parameter prevSet: The ``RantFeed/set`` you got in the last fetch. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults, the SwiftRant instance will get the set from the last fetch from User Defaults.
-    /// - returns: A tuple that contains an error in a `String` and the feed as a ``RantFeed``. If the fetch is successful, the ``RantFeed`` in the tuple will hold the actual auth token info, while the `String` in the tuple is `nil`. If the fetch is unsuccessful, then the `String` in the tuple will hold an error message, while the ``RantFeed`` in the tuple will be `nil`.
+    /// - returns: A tuple that contains an error in a `String` and the feed as a ``RantFeed``. If the fetch is successful, the ``RantFeed`` in the tuple will contain the feed, while the `String` in the tuple is `nil`. If the fetch is unsuccessful, then the `String` in the tuple will hold an error message, while the ``RantFeed`` in the tuple will be `nil`.
     public func getRantFeed(token: UserCredentials?, skip: Int, prevSet: String?) async -> (String?, RantFeed?) {
         return await withCheckedContinuation { continuation in
             self.getRantFeed(token: token, skip: skip, prevSet: prevSet) { error, feed in
                 continuation.resume(returning: (error, feed))
+            }
+        }
+    }
+    
+    /// Get a specific week's Weekly Rant Week rant feed.
+    ///
+    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    /// - parameter limit: The maximum amount of rants to provide in the response. Default is 20.
+    /// - parameter skip: How many rants to skip before loading. Used for pagination/infinite scroll.
+    /// - parameter week: The week number to fetch.
+    /// - returns: A tuple that contains an error in a `String` and the feed as a ``RantFeed``. If the fetch is successful, the ``RantFeed`` in the tuple will contain the feed, while the `String` in the tuple is `nil`. If the fetch is unsuccessful, then the `String` in the tuple will hold an error message, while the ``RantFeed`` in the tuple will be `nil`.
+    public func getWeeklyRants(token: UserCredentials?, limit: Int = 20, skip: Int, week: Int) async -> (String?, RantFeed?) {
+        return await withCheckedContinuation { continuation in
+            self.getWeeklyRants(token: token, limit: limit, skip: skip, week: week) { error, feed in
+                continuation.resume(returning: (error, feed))
+            }
+        }
+    }
+    
+    /// Get the list of Weekly Rant weeks.
+    ///
+    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    /// - returns: A tuple that contains an error in a `String` and the list as a ``WeeklyList``. If the fetch is successful, the ``WeeklyList`` in the tuple will contain the list, while the `String` in the tuple is `nil`. If the fetch is unsuccessful, then the `String` in the tuple will hold an error message, while the ``WeeklyList`` in the tuple will be `nil`.
+    public func getWeekList(token: UserCredentials?) async -> (String?, WeeklyList?) {
+        return await withCheckedContinuation { continuation in
+            self.getWeekList(token: token) { error, list in
+                continuation.resume(returning: (error, list))
             }
         }
     }
