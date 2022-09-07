@@ -126,6 +126,18 @@ public struct RantInSubscribedFeed: Decodable {
         
         /// The action the user performed.
         public let action: UserAction
+        
+        public init(userID: Int, action: RantInSubscribedFeed.RelatedUserAction.UserAction) {
+            self.userID = userID
+            self.action = action
+        }
+        
+        public init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: RantInSubscribedFeed.RelatedUserAction.CodingKeys.self)
+            
+            userID = Int(try values.decode(String.self, forKey: .userID))!
+            action = RantInSubscribedFeed.RelatedUserAction.UserAction(rawValue: try values.decode(String.self, forKey: .action))!
+        }
     }
     
     /// The rant's ID.
@@ -166,9 +178,20 @@ public struct RantInSubscribedFeed: Decodable {
         case rant
         case actions
     }
-}
-
-extension RantInSubscribedFeed {
+    
+    public init(id: Int, text: String, score: Int, createdTime: Int, attachedImage: Rant.AttachedImage?, commentCount: Int, tags: [String], voteState: Int, isEdited: Bool, relatedUserActions: [RantInSubscribedFeed.RelatedUserAction]) {
+        self.id = id
+        self.text = text
+        self.score = score
+        self.createdTime = createdTime
+        self.attachedImage = attachedImage
+        self.commentCount = commentCount
+        self.tags = tags
+        self.voteState = voteState
+        self.isEdited = isEdited
+        self.relatedUserActions = relatedUserActions
+    }
+    
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         
@@ -196,14 +219,5 @@ extension RantInSubscribedFeed {
         isEdited = rantInFeedProperties["edited"]! as! Bool
         
         relatedUserActions = try values.decode([RelatedUserAction].self, forKey: .actions)
-    }
-}
-
-extension RantInSubscribedFeed.RelatedUserAction {
-    public init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: RantInSubscribedFeed.RelatedUserAction.CodingKeys.self)
-        
-        userID = Int(try values.decode(String.self, forKey: .userID))!
-        action = RantInSubscribedFeed.RelatedUserAction.UserAction(rawValue: try values.decode(String.self, forKey: .action))!
     }
 }

@@ -24,6 +24,13 @@ public struct Rant: Decodable, Identifiable {
         
         /// The week number for the weekly group rant.
         public let week: Int
+        
+        public init(date: String, height: Int, topic: String, week: Int) {
+            self.date = date
+            self.height = height
+            self.topic = topic
+            self.week = week
+        }
     }
 
     /// Holds information about links inside rants and comments.
@@ -67,6 +74,34 @@ public struct Rant: Decodable, Identifiable {
                  start,
                  end
         }
+        
+        public init(type: String, url: String, shortURL: String?, title: String, start: Int?, end: Int?, calculatedRange: NSRange? = nil) {
+            self.type = type
+            self.url = url
+            self.shortURL = shortURL
+            self.title = title
+            self.start = start
+            self.end = end
+            self.calculatedRange = calculatedRange
+        }
+        
+        public init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            
+            type = try values.decode(String.self, forKey: .type)
+            
+            do {
+                url = try values.decode(String.self, forKey: .url)
+            } catch {
+                url = try String(values.decode(Int.self, forKey: .url))
+            }
+            
+            //url = try values.decodeIfPresent(String.self, forKey: .url) ?? String(values.decode(Int.self, forKey: .url))
+            shortURL = try values.decodeIfPresent(String.self, forKey: .shortURL)
+            title = try values.decode(String.self, forKey: .title)
+            start = try values.decodeIfPresent(Int.self, forKey: .start)
+            end = try values.decodeIfPresent(Int.self, forKey: .end)
+        }
     }
 
     /// Holds information about attached images in rants and comments.
@@ -81,6 +116,12 @@ public struct Rant: Decodable, Identifiable {
         
         /// The attached image's height.
         public let height: Int
+        
+        public init(url: String, width: Int, height: Int) {
+            self.url = url
+            self.width = width
+            self.height = height
+        }
     }
 
     /// Holds information about a user's avatar.
@@ -95,6 +136,18 @@ public struct Rant: Decodable, Identifiable {
         enum CodingKeys: String, CodingKey {
             case backgroundColor = "b",
                  avatarImage = "i"
+        }
+        
+        public init(backgroundColor: String, avatarImage: String?) {
+            self.backgroundColor = backgroundColor
+            self.avatarImage = avatarImage
+        }
+        
+        public init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            
+            backgroundColor = try values.decode(String.self, forKey: .backgroundColor)
+            avatarImage = try? values.decode(String.self, forKey: .avatarImage)
         }
     }
     
@@ -229,9 +282,34 @@ public struct Rant: Decodable, Identifiable {
         /// Represents an undefined post type (not available anymore in the official client).
         case undefined = 7
     }
-}
-
-extension Rant {
+    
+    public init(weekly: Rant.Weekly?, id: Int, text: String, score: Int, createdTime: Int, attachedImage: Rant.AttachedImage?, commentCount: Int, tags: [String], voteState: Int, isEdited: Bool, isFavorite: Int? = nil, link: String?, links: [Rant.Link]? = nil, collabTypeLong: String?, collabDescription: String?, collabTechStack: String?, collabTeamSize: String?, collabURL: String?, userID: Int, username: String, userScore: Int, userAvatar: Rant.UserAvatar, userAvatarLarge: Rant.UserAvatar, isUserDPP: Int?) {
+        self.weekly = weekly
+        self.id = id
+        self.text = text
+        self.score = score
+        self.createdTime = createdTime
+        self.attachedImage = attachedImage
+        self.commentCount = commentCount
+        self.tags = tags
+        self.voteState = voteState
+        self.isEdited = isEdited
+        self.isFavorite = isFavorite
+        self.link = link
+        self.links = links
+        self.collabTypeLong = collabTypeLong
+        self.collabDescription = collabDescription
+        self.collabTechStack = collabTechStack
+        self.collabTeamSize = collabTeamSize
+        self.collabURL = collabURL
+        self.userID = userID
+        self.username = username
+        self.userScore = userScore
+        self.userAvatar = userAvatar
+        self.userAvatarLarge = userAvatarLarge
+        self.isUserDPP = isUserDPP
+    }
+    
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         
@@ -286,34 +364,5 @@ extension Rant {
                 }
             }
         }
-    }
-}
-
-extension Rant.Link {
-    public init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        
-        type = try values.decode(String.self, forKey: .type)
-        
-        do {
-            url = try values.decode(String.self, forKey: .url)
-        } catch {
-            url = try String(values.decode(Int.self, forKey: .url))
-        }
-        
-        //url = try values.decodeIfPresent(String.self, forKey: .url) ?? String(values.decode(Int.self, forKey: .url))
-        shortURL = try values.decodeIfPresent(String.self, forKey: .shortURL)
-        title = try values.decode(String.self, forKey: .title)
-        start = try values.decodeIfPresent(Int.self, forKey: .start)
-        end = try values.decodeIfPresent(Int.self, forKey: .end)
-    }
-}
-
-extension Rant.UserAvatar {
-    public init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        
-        backgroundColor = try values.decode(String.self, forKey: .backgroundColor)
-        avatarImage = try? values.decode(String.self, forKey: .avatarImage)
     }
 }
