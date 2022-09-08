@@ -56,6 +56,27 @@ public struct RantFeed: Decodable {
         
         /// The expected action that should take place when the news story is tapped/clicked on.
         public let action: RantFeedNewsAction
+        
+        enum CodingKeys: CodingKey {
+            case id
+            case type
+            case headline
+            case body
+            case footer
+            case height
+            case action
+        }
+        
+        public init(from decoder: Decoder) throws {
+            let container: KeyedDecodingContainer<RantFeed.News.CodingKeys> = try decoder.container(keyedBy: RantFeed.News.CodingKeys.self)
+            self.id = try container.decode(Int.self, forKey: RantFeed.News.CodingKeys.id)
+            self.type = try container.decode(String.self, forKey: RantFeed.News.CodingKeys.type)
+            self.headline = try container.decode(String.self, forKey: RantFeed.News.CodingKeys.headline)
+            self.body = try container.decodeIfPresent(String.self, forKey: RantFeed.News.CodingKeys.body)
+            self.footer = try container.decode(String.self, forKey: RantFeed.News.CodingKeys.footer)
+            self.height = try container.decode(Int.self, forKey: RantFeed.News.CodingKeys.height)
+            self.action = try container.decode(RantFeed.RantFeedNewsAction.self, forKey: RantFeed.News.CodingKeys.action)
+        }
     }
     
     /// Has all cases of actions for tapping on a news heading in the rant feed.
