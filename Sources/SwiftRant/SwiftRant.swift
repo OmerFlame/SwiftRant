@@ -228,11 +228,6 @@ public class SwiftRant {
     
     /// Removes the user credentials login token from the keychain.
     public func logOut() {
-        let keychainWrapper = KeychainWrapper(
-            serviceName: "SwiftRant",
-            accessGroup: "SwiftRantAccessGroup"
-        )
-        
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecReturnAttributes as String: true,
