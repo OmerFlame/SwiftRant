@@ -103,10 +103,10 @@ public struct RantFeed: Decodable {
     
     /// The amount of unread notifications.
     /// - note: I have **no** idea why the developers of devRant duplicated this. It's a duplicate of ``Unread-swift.struct/total``.
-    public let notifCount: Int
+    public let notifCount: Int?
     
     /// Contains the amount of unread notifications.
-    public let unread: Unread
+    public let unread: Unread?
     
     /// The current weekly news.
     public let news: News?
@@ -132,7 +132,7 @@ extension RantFeed {
         set = try values.decodeIfPresent(String.self, forKey: .set)
         weeklyRantWeek = try? values.decode(Int.self, forKey: .weeklyRantWeek)
         isUserDPP = try values.decodeIfPresent(Int.self, forKey: .isUserDPP) ?? 0
-        notifCount = try values.decode(Int.self, forKey: .notifCount)
+        notifCount = try values.decodeIfPresent(Int.self, forKey: .notifCount)
         unread = try values.decode(Unread.self, forKey: .unread)
         news = try values.decodeIfPresent(News.self, forKey: .news)
     }
