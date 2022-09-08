@@ -93,7 +93,7 @@ public struct RantFeed: Decodable {
     public let settings: Settings
     
     /// The feed's session hash.
-    public let set: String
+    public let set: String?
     
     /// The Weekly Group Rant week number.
     public let weeklyRantWeek: Int?
@@ -129,7 +129,7 @@ extension RantFeed {
         
         rants = try values.decode([RantInFeed].self, forKey: .rants)
         settings = try values.decode(Settings.self, forKey: .settings)
-        set = try values.decode(String.self, forKey: .set)
+        set = try values.decodeIfPresent(String.self, forKey: .set)
         weeklyRantWeek = try? values.decode(Int.self, forKey: .weeklyRantWeek)
         isUserDPP = try values.decodeIfPresent(Int.self, forKey: .isUserDPP) ?? 0
         notifCount = try values.decode(Int.self, forKey: .notifCount)
