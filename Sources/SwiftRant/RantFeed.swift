@@ -46,7 +46,7 @@ public struct RantFeed: Decodable {
         public let headline: String
         
         /// The contents of the news story.
-        public let body: String
+        public let body: String?
         
         /// The footer of the news story.
         public let footer: String
