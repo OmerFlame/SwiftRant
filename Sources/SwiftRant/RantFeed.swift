@@ -133,7 +133,7 @@ extension RantFeed {
         weeklyRantWeek = try? values.decode(Int.self, forKey: .weeklyRantWeek)
         isUserDPP = try values.decodeIfPresent(Int.self, forKey: .isUserDPP) ?? 0
         notifCount = try values.decodeIfPresent(Int.self, forKey: .notifCount)
-        unread = try values.decode(Unread.self, forKey: .unread)
+        unread = try values.decodeIfPresent(Unread.self, forKey: .unread)
         news = try values.decodeIfPresent(News.self, forKey: .news)
     }
 }
