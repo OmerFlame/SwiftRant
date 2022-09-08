@@ -62,7 +62,7 @@ public struct RantFeed: Decodable {
         public let headline: String
         
         /// The contents of the news story.
-        public let body: String
+        public let body: String?
         
         /// The footer of the news story.
         public let footer: String
@@ -73,7 +73,17 @@ public struct RantFeed: Decodable {
         /// The expected action that should take place when the news story is tapped/clicked on.
         public let action: RantFeedNewsAction
         
-        public init(id: Int, type: String, headline: String, body: String, footer: String, height: Int, action: RantFeed.RantFeedNewsAction) {
+        enum CodingKeys: CodingKey {
+            case id
+            case type
+            case headline
+            case body
+            case footer
+            case height
+            case action
+        }
+        
+        public init(id: Int, type: String, headline: String, body: String?, footer: String, height: Int, action: RantFeed.RantFeedNewsAction) {
             self.id = id
             self.type = type
             self.headline = headline
@@ -81,6 +91,17 @@ public struct RantFeed: Decodable {
             self.footer = footer
             self.height = height
             self.action = action
+        }
+        
+        public init(from decoder: Decoder) throws {
+            let container: KeyedDecodingContainer<RantFeed.News.CodingKeys> = try decoder.container(keyedBy: RantFeed.News.CodingKeys.self)
+            self.id = try container.decode(Int.self, forKey: RantFeed.News.CodingKeys.id)
+            self.type = try container.decode(String.self, forKey: RantFeed.News.CodingKeys.type)
+            self.headline = try container.decode(String.self, forKey: RantFeed.News.CodingKeys.headline)
+            self.body = try container.decodeIfPresent(String.self, forKey: RantFeed.News.CodingKeys.body)
+            self.footer = try container.decode(String.self, forKey: RantFeed.News.CodingKeys.footer)
+            self.height = try container.decode(Int.self, forKey: RantFeed.News.CodingKeys.height)
+            self.action = try container.decode(RantFeed.RantFeedNewsAction.self, forKey: RantFeed.News.CodingKeys.action)
         }
     }
     
@@ -98,7 +119,7 @@ public struct RantFeed: Decodable {
     public let settings: Settings
     
     /// The feed's session hash.
-    public let set: String
+    public let set: String?
     
     /// The Weekly Group Rant week number.
     public let weeklyRantWeek: Int?
@@ -108,10 +129,10 @@ public struct RantFeed: Decodable {
     
     /// The amount of unread notifications.
     /// - note: I have **no** idea why the developers of devRant duplicated this. It's a duplicate of ``Unread-swift.struct/total``.
-    public let notifCount: Int
+    public let notifCount: Int?
     
     /// Contains the amount of unread notifications.
-    public let unread: Unread
+    public let unread: Unread?
     
     /// The current weekly news.
     public let news: News?
@@ -127,7 +148,7 @@ public struct RantFeed: Decodable {
         case news
     }
     
-    public init(rants: [RantInFeed], settings: RantFeed.Settings, set: String, weeklyRantWeek: Int?, isUserDPP: Int, notifCount: Int, unread: RantFeed.Unread, news: RantFeed.News?) {
+    public init(rants: [RantInFeed], settings: RantFeed.Settings, set: String?, weeklyRantWeek: Int?, isUserDPP: Int, notifCount: Int?, unread: RantFeed.Unread?, news: RantFeed.News?) {
         self.rants = rants
         self.settings = settings
         self.set = set
@@ -143,11 +164,11 @@ public struct RantFeed: Decodable {
         
         rants = try values.decode([RantInFeed].self, forKey: .rants)
         settings = try values.decode(Settings.self, forKey: .settings)
-        set = try values.decode(String.self, forKey: .set)
+        set = try values.decodeIfPresent(String.self, forKey: .set)
         weeklyRantWeek = try? values.decode(Int.self, forKey: .weeklyRantWeek)
         isUserDPP = try values.decodeIfPresent(Int.self, forKey: .isUserDPP) ?? 0
-        notifCount = try values.decode(Int.self, forKey: .notifCount)
-        unread = try values.decode(Unread.self, forKey: .unread)
+        notifCount = try values.decodeIfPresent(Int.self, forKey: .notifCount)
+        unread = try values.decodeIfPresent(Unread.self, forKey: .unread)
         news = try values.decodeIfPresent(News.self, forKey: .news)
     }
 }

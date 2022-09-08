@@ -383,9 +383,9 @@ public class SwiftRant {
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
     /// - parameter limit: The maximum amount of rants to provide in the response. Default is 20.
     /// - parameter skip: How many rants to skip before loading. Used for pagination/infinite scroll.
-    /// - parameter week: The week number to fetch.
+    /// - parameter week: The week number to fetch. This variable is optional. If you want to get the latest week's rants, skip this variable in the call.
     /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch is successful, the ``RantFeed`` parameter will contain the feed, while the `String` is `nil`. If the fetch is unsuccessful, then the `String` will hold an error message, while the ``RantFeed`` will be `nil`.
-    public func getWeeklyRants(token: UserCredentials?, limit: Int = 20, skip: Int, week: Int, completionHandler: @escaping ((String?, RantFeed?) -> Void)) {
+    public func getWeeklyRants(token: UserCredentials?, limit: Int = 20, skip: Int, week: Int = -1, completionHandler: @escaping ((String?, RantFeed?) -> Void)) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
                 fatalError("No token was specified!")
@@ -416,7 +416,7 @@ public class SwiftRant {
             }
         }
         
-        let resourceURL = URL(string: baseURL + "/devrant/weekly-rants?limit=\(limit)&skip=\(skip)&sort=algo&week=\(week)&hide_reposts=0&app=3&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+        let resourceURL = URL(string: baseURL + "/devrant/weekly-rants?limit=\(limit)&skip=\(skip)&sort=algo\(week != -1 ? "&week=\(week)" : "")&hide_reposts=0&app=3&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
         
         var request = URLRequest(url: resourceURL)
         request.httpMethod = "GET"
