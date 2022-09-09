@@ -23,6 +23,18 @@ public struct RantFeed: Decodable {
             case notificationState = "notif_state"
             case notificationToken = "notif_token"
         }
+        
+        public init(notificationState: String, notificationToken: String?) {
+            self.notificationState = notificationState
+            self.notificationToken = notificationToken
+        }
+        
+        public init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            
+            notificationState = try values.decode(String.self, forKey: .notificationState)
+            notificationToken = try? values.decode(String.self, forKey: .notificationToken)
+        }
     }
     
     /// Contains the amount of unread notifications.
@@ -30,6 +42,10 @@ public struct RantFeed: Decodable {
         
         /// The total count of unread notifications.
         public let total: Int
+        
+        public init(total: Int) {
+            self.total = total
+        }
     }
     
     /// Contains information about news given in rant feeds.
@@ -65,6 +81,16 @@ public struct RantFeed: Decodable {
             case footer
             case height
             case action
+        }
+        
+        public init(id: Int, type: String, headline: String, body: String?, footer: String, height: Int, action: RantFeed.RantFeedNewsAction) {
+            self.id = id
+            self.type = type
+            self.headline = headline
+            self.body = body
+            self.footer = footer
+            self.height = height
+            self.action = action
         }
         
         public init(from decoder: Decoder) throws {
@@ -121,9 +147,18 @@ public struct RantFeed: Decodable {
         case unread
         case news
     }
-}
-
-extension RantFeed {
+    
+    public init(rants: [RantInFeed], settings: RantFeed.Settings, set: String?, weeklyRantWeek: Int?, isUserDPP: Int, notifCount: Int?, unread: RantFeed.Unread?, news: RantFeed.News?) {
+        self.rants = rants
+        self.settings = settings
+        self.set = set
+        self.weeklyRantWeek = weeklyRantWeek
+        self.isUserDPP = isUserDPP
+        self.notifCount = notifCount
+        self.unread = unread
+        self.news = news
+    }
+    
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         
@@ -135,14 +170,5 @@ extension RantFeed {
         notifCount = try values.decodeIfPresent(Int.self, forKey: .notifCount)
         unread = try values.decodeIfPresent(Unread.self, forKey: .unread)
         news = try values.decodeIfPresent(News.self, forKey: .news)
-    }
-}
-
-extension RantFeed.Settings {
-    public init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        
-        notificationState = try values.decode(String.self, forKey: .notificationState)
-        notificationToken = try? values.decode(String.self, forKey: .notificationToken)
     }
 }

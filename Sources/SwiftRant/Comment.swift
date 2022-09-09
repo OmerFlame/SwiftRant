@@ -70,7 +70,39 @@ public struct Comment: Decodable, Identifiable {
              attachedImage = "attached_image"
     }
     
-    public mutating func precalculateLinkRanges() {
+    public init(uuid: UUID = UUID(), id: Int, rantID: Int, body: String, score: Int, createdTime: Int, voteState: Int, links: [Rant.Link]?, userID: Int, username: String, userScore: Int, userAvatar: Rant.UserAvatar, isUserDPP: Int?, attachedImage: Rant.AttachedImage?) {
+        self.uuid = uuid
+        self.id = id
+        self.rantID = rantID
+        self.body = body
+        self.score = score
+        self.createdTime = createdTime
+        self.voteState = voteState
+        self.links = links
+        self.userID = userID
+        self.username = username
+        self.userScore = userScore
+        self.userAvatar = userAvatar
+        self.isUserDPP = isUserDPP
+        self.attachedImage = attachedImage
+    }
+    
+    public init(decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(Int.self, forKey: .id)
+        rantID = try values.decode(Int.self, forKey: .rantID)
+        body = try values.decode(String.self, forKey: .body)
+        score = try values.decode(Int.self, forKey: .score)
+        createdTime = try values.decode(Int.self, forKey: .createdTime)
+        voteState = try values.decode(Int.self, forKey: .voteState)
+        links = try? values.decodeIfPresent([Rant.Link].self, forKey: .links)
+        userID = try values.decode(Int.self, forKey: .userID)
+        username = try values.decode(String.self, forKey: .username)
+        userScore = try values.decode(Int.self, forKey: .userScore)
+        userAvatar = try values.decode(Rant.UserAvatar.self, forKey: .userAvatar)
+        isUserDPP = try? values.decode(Int.self, forKey: .isUserDPP)
+        attachedImage = try? values.decode(Rant.AttachedImage.self, forKey: .attachedImage)
+        
         if links != nil {
             let stringAsData = body.data(using: .utf8)!
             
@@ -91,25 +123,8 @@ public struct Comment: Decodable, Identifiable {
             }
         }
     }
-}
-
-extension Comment {
-    public init(decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        id = try values.decode(Int.self, forKey: .id)
-        rantID = try values.decode(Int.self, forKey: .rantID)
-        body = try values.decode(String.self, forKey: .body)
-        score = try values.decode(Int.self, forKey: .score)
-        createdTime = try values.decode(Int.self, forKey: .createdTime)
-        voteState = try values.decode(Int.self, forKey: .voteState)
-        links = try? values.decodeIfPresent([Rant.Link].self, forKey: .links)
-        userID = try values.decode(Int.self, forKey: .userID)
-        username = try values.decode(String.self, forKey: .username)
-        userScore = try values.decode(Int.self, forKey: .userScore)
-        userAvatar = try values.decode(Rant.UserAvatar.self, forKey: .userAvatar)
-        isUserDPP = try? values.decode(Int.self, forKey: .isUserDPP)
-        attachedImage = try? values.decode(Rant.AttachedImage.self, forKey: .attachedImage)
-        
+    
+    public mutating func precalculateLinkRanges() {
         if links != nil {
             let stringAsData = body.data(using: .utf8)!
             

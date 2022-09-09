@@ -9,6 +9,10 @@ import Foundation
 
 struct NotificationFeed: Decodable {
     public let data: Notifications
+    
+    public init(data: Notifications) {
+        self.data = data
+    }
 }
 
 /// A model representing the notification data.
@@ -43,6 +47,15 @@ public struct Notifications: Decodable {
         
         /// The total amount of unread upvotes.
         public let upvotes: Int
+        
+        public init(all: Int, comments: Int, mentions: Int, subs: Int, total: Int, upvotes: Int) {
+            self.all = all
+            self.comments = comments
+            self.mentions = mentions
+            self.subs = subs
+            self.total = total
+            self.upvotes = upvotes
+        }
     }
     
     /// The server-side Unix timestamp at which the list of notifications were last checked.
@@ -63,18 +76,20 @@ public struct Notifications: Decodable {
         case unread
         case usernameMap = "username_map"
     }
-}
-
-extension Notifications {
+    
+    public init(checkTime: Int, items: [Notification], unread: Notifications.UnreadNotifications, usernameMap: Notifications.UsernameMapArray?) {
+        self.checkTime = checkTime
+        self.items = items
+        self.unread = unread
+        self.usernameMap = usernameMap
+    }
+    
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         
         checkTime = try values.decode(Int.self, forKey: .checkTime)
-        
         items = try values.decodeIfPresent([Notification].self, forKey: .items) ?? []
-        
         unread = try values.decode(UnreadNotifications.self, forKey: .unread)
-        
         usernameMap = try? values.decode(UsernameMapArray.self, forKey: .usernameMap)
     }
 }
@@ -118,9 +133,16 @@ public struct Notification: Decodable, Equatable {
             lhs.type == rhs.type &&
             lhs.uid == rhs.uid
     }
-}
-
-extension Notification {
+    
+    public init(commentID: Int?, createdTime: Int, rantID: Int, read: Int, type: NotificationType, uid: Int) {
+        self.commentID = commentID
+        self.createdTime = createdTime
+        self.rantID = rantID
+        self.read = read
+        self.type = type
+        self.uid = uid
+    }
+    
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         

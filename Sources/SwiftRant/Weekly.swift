@@ -32,6 +32,13 @@ public struct WeeklyList: Decodable {
             case rantCount = "num_rants"
         }
         
+        public init(week: Int, prompt: String, date: String, rantCount: Int) {
+            self.week = week
+            self.prompt = prompt
+            self.date = date
+            self.rantCount = rantCount
+        }
+        
         public init(from decoder: Decoder) throws {
             let container: KeyedDecodingContainer<WeeklyList.Week.CodingKeys> = try decoder.container(keyedBy: WeeklyList.Week.CodingKeys.self)
             self.week = try container.decode(Int.self, forKey: WeeklyList.Week.CodingKeys.week)
@@ -48,23 +55,12 @@ public struct WeeklyList: Decodable {
         case weeks
     }
     
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.weeks = try container.decode([WeeklyList.Week].self, forKey: .weeks)
-    }
-}
-
-extension WeeklyList {
     public init(weeks: [WeeklyList.Week]) {
         self.weeks = weeks
     }
-}
-
-extension WeeklyList.Week {
-    public init(week: Int, prompt: String, date: String, rantCount: Int) {
-        self.week = week
-        self.prompt = prompt
-        self.date = date
-        self.rantCount = rantCount
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.weeks = try container.decode([WeeklyList.Week].self, forKey: .weeks)
     }
 }

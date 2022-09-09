@@ -109,9 +109,28 @@ public struct RantInFeed: Decodable, Identifiable {
              userAvatarLarge = "user_avatar_lg",
              isUserDPP = "user_dpp"
     }
-}
-
-extension RantInFeed {
+    
+    public init(id: Int, text: String, score: Int, createdTime: Int, attachedImage: Rant.AttachedImage?, commentCount: Int, tags: [String], voteState: VoteState, isEdited: Bool, link: String?, collabType: Int?, collabTypeLong: String?, userID: Int, username: String, userScore: Int, userAvatar: Rant.UserAvatar, userAvatarLarge: Rant.UserAvatar, isUserDPP: Int?) {
+        self.id = id
+        self.text = text
+        self.score = score
+        self.createdTime = createdTime
+        self.attachedImage = attachedImage
+        self.commentCount = commentCount
+        self.tags = tags
+        self.voteStateRaw = voteState.rawValue
+        self.isEdited = isEdited
+        self.link = link
+        self.collabType = collabType
+        self.collabTypeLong = collabTypeLong
+        self.userID = userID
+        self.username = username
+        self.userScore = userScore
+        self.userAvatar = userAvatar
+        self.userAvatarLarge = userAvatarLarge
+        self.isUserDPP = isUserDPP
+    }
+    
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         id = try values.decode(Int.self, forKey: .id)

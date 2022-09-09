@@ -31,6 +31,22 @@ public struct UserCredentials: Codable, Equatable {
             case userID = "user_id"
         }
         
+        public init(tokenID: Int, tokenKey: String, expireTime: Int, userID: Int) {
+            self.tokenID = tokenID
+            self.tokenKey = tokenKey
+            self.expireTime = expireTime
+            self.userID = userID
+        }
+        
+        public init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            
+            tokenID = try values.decode(Int.self, forKey: .tokenID)
+            tokenKey = try values.decode(String.self, forKey: .tokenKey)
+            expireTime = try values.decode(Int.self, forKey: .expireTime)
+            userID = try values.decode(Int.self, forKey: .userID)
+        }
+        
         public func encode(to encoder: Encoder) throws {
             var values = encoder.container(keyedBy: CodingKeys.self)
             
@@ -48,6 +64,16 @@ public struct UserCredentials: Codable, Equatable {
         case authToken = "auth_token"
     }
     
+    public init(authToken: UserCredentials.AuthToken) {
+        self.authToken = authToken
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        
+        authToken = try values.decode(AuthToken.self, forKey: .authToken)
+    }
+    
     public func encode(to encoder: Encoder) throws {
         var values = encoder.container(keyedBy: CodingKeys.self)
         
@@ -59,24 +85,5 @@ public struct UserCredentials: Codable, Equatable {
             lhs.authToken.tokenID == rhs.authToken.tokenID &&
             lhs.authToken.tokenKey == rhs.authToken.tokenKey &&
             lhs.authToken.expireTime == rhs.authToken.expireTime
-    }
-}
-
-extension UserCredentials {
-    public init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        
-        authToken = try values.decode(AuthToken.self, forKey: .authToken)
-    }
-}
-
-extension UserCredentials.AuthToken {
-    public init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        
-        tokenID = try values.decode(Int.self, forKey: .tokenID)
-        tokenKey = try values.decode(String.self, forKey: .tokenKey)
-        expireTime = try values.decode(Int.self, forKey: .expireTime)
-        userID = try values.decode(Int.self, forKey: .userID)
     }
 }

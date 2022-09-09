@@ -17,6 +17,11 @@ public struct Profile: Decodable {
         
         /// How much content of every type made by the user exists on devRant.
         public let counts: UserCounts
+        
+        public init(content: Profile.InnerUserContent, counts: Profile.UserCounts) {
+            self.content = content
+            self.counts = counts
+        }
     }
     
     /// The actual content created by the user.
@@ -44,6 +49,33 @@ public struct Profile: Decodable {
                  favorites,
                  viewed
         }
+        
+        public init(rants: [RantInFeed], upvoted: [RantInFeed], comments: [Comment], favorites: [RantInFeed]? = nil, viewed: [RantInFeed]? = nil) {
+            self.rants = rants
+            self.upvoted = upvoted
+            self.comments = comments
+            self.favorites = favorites
+            self.viewed = viewed
+        }
+        
+        public init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            rants = try values.decode([RantInFeed].self, forKey: .rants)
+            upvoted = try values.decode([RantInFeed].self, forKey: .upvoted)
+            comments = try values.decode([Comment].self, forKey: .comments)
+            
+            do {
+                favorites = try values.decode([RantInFeed].self, forKey: .favorites)
+            } catch {
+                favorites = nil
+            }
+            
+            do {
+                viewed = try values.decode([RantInFeed].self, forKey: .viewed)
+            } catch {
+                viewed = nil
+            }
+        }
     }
     
     /// A structure representing the amount of content the user has created for every single type of content.
@@ -70,6 +102,23 @@ public struct Profile: Decodable {
                  comments,
                  favorites,
                  collabs
+        }
+        
+        public init(rants: Int, upvoted: Int, comments: Int, favorites: Int, collabs: Int) {
+            self.rants = rants
+            self.upvoted = upvoted
+            self.comments = comments
+            self.favorites = favorites
+            self.collabs = collabs
+        }
+        
+        public init(from decoder: Decoder) throws {
+            let values = try decoder.container(keyedBy: CodingKeys.self)
+            rants = try values.decode(Int.self, forKey: .rants)
+            upvoted = try values.decode(Int.self, forKey: .upvoted)
+            comments = try values.decode(Int.self, forKey: .comments)
+            favorites = try values.decode(Int.self, forKey: .favorites)
+            collabs = try values.decode(Int.self, forKey: .collabs)
         }
     }
     
@@ -144,9 +193,22 @@ public struct Profile: Decodable {
              avatarSmall = "avatar_sm",
              isUserDPP = "dpp"
     }
-}
-
-extension Profile {
+    
+    public init(username: String, score: Int, about: String, location: String, createdTime: Int, skills: String, github: String, website: String?, content: Profile.OuterUserContent, avatar: Rant.UserAvatar, avatarSmall: Rant.UserAvatar, isUserDPP: Int?) {
+        self.username = username
+        self.score = score
+        self.about = about
+        self.location = location
+        self.createdTime = createdTime
+        self.skills = skills
+        self.github = github
+        self.website = website
+        self.content = content
+        self.avatar = avatar
+        self.avatarSmall = avatarSmall
+        self.isUserDPP = isUserDPP
+    }
+    
     public init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         
@@ -162,37 +224,5 @@ extension Profile {
         avatar = try values.decode(Rant.UserAvatar.self, forKey: .avatar)
         avatarSmall = try values.decode(Rant.UserAvatar.self, forKey: .avatarSmall)
         isUserDPP = try? values.decode(Int.self, forKey: .isUserDPP)
-    }
-}
-
-extension Profile.InnerUserContent {
-    public init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        rants = try values.decode([RantInFeed].self, forKey: .rants)
-        upvoted = try values.decode([RantInFeed].self, forKey: .upvoted)
-        comments = try values.decode([Comment].self, forKey: .comments)
-        
-        do {
-            favorites = try values.decode([RantInFeed].self, forKey: .favorites)
-        } catch {
-            favorites = nil
-        }
-        
-        do {
-            viewed = try values.decode([RantInFeed].self, forKey: .viewed)
-        } catch {
-            viewed = nil
-        }
-    }
-}
-
-extension Profile.UserCounts {
-    public init(from decoder: Decoder) throws {
-        let values = try decoder.container(keyedBy: CodingKeys.self)
-        rants = try values.decode(Int.self, forKey: .rants)
-        upvoted = try values.decode(Int.self, forKey: .upvoted)
-        comments = try values.decode(Int.self, forKey: .comments)
-        favorites = try values.decode(Int.self, forKey: .favorites)
-        collabs = try values.decode(Int.self, forKey: .collabs)
     }
 }
