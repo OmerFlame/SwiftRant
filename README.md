@@ -5,7 +5,7 @@ devRant API library made in Swift.
 
 Simply add this line to your Package.swift file:
 
-`.package(name: "SwiftRant", url: "https://github.com/OmerFlame/SwiftRant", from: "0.11.0")`
+`.package(name: "SwiftRant", url: "https://github.com/OmerFlame/SwiftRant", from: "2.0.0")`
 
 ## Documentation
 
