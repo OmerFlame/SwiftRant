@@ -15,7 +15,7 @@ fileprivate struct RantResponse: Decodable {
     public var rant: Rant
     
     /// The comments listed under the rant.
-    public var comments: [Comment]?
+    public var comments: [Comment]
     
     private enum CodingKeys: String, CodingKey {
         case rant, comments
@@ -26,15 +26,24 @@ fileprivate struct RantResponse: Decodable {
         
         rant = try values.decode(Rant.self, forKey: .rant)
         
+        do {
+            comments = try values.decode([Comment].self, forKey: .comments)
+        } catch {
+            comments = []
+        }
         
-        comments = try values.decodeIfPresent([Comment].self, forKey: .comments)
-        
-        if comments != nil {
-            for idx in 0..<comments!.count {
-                comments![idx].precalculateLinkRanges()
-            }
+        for idx in 0..<comments.count {
+            comments[idx].precalculateLinkRanges()
         }
     }
+}
+
+public protocol SwiftRantErrorProtocol: Error {
+    var message: String { get }
+}
+
+public struct SwiftRantError: SwiftRantErrorProtocol {
+    public var message: String
 }
 
 fileprivate struct CommentResponse: Decodable {
@@ -118,14 +127,13 @@ public class SwiftRant {
     
     /// Returns an auth token if the username and password are both correct.
     ///
-    /// - Parameter username: The username of the user attempting to log in.
-    /// - Parameter password: The password of the user attempting to log in.
-    /// - Parameter completionHandler: an escaping method that takes in a `String` parameter and a ``UserCredentials`` parameter.
+    /// - Parameters:
+    ///    - username: The username of the user attempting to log in.
+    ///    - password: The password of the user attempting to log in.
+    ///    - completionHandler: The completion handler to call when the authentication process is complete.
     ///
-    /// If the authentication is successful, the ``UserCredentials`` parameter will hold the actual auth token info, while the `String` is `nil`. If the authentication is unsuccessful, then the `String` will hold an error message, while the ``UserCredentials`` will be `nil`.
-    ///
-    /// If you called this method while initializing ``SwiftRant`` while setting `shouldUseKeychainAndUserDefaults` with `true`, the username, password and access token will be stored in the Keychain securely.
-    public func logIn(username: String, password: String, completionHandler: @escaping ((String?, UserCredentials?) -> Void)) {
+    ///        The completion handler takes in a single `result` parameter which will contain the result of the request (``UserCredentials`` with the auth token info if successful, ``SwiftRantError`` if failed).
+    public func logIn(username: String, password: String, completionHandler: @escaping (Result<UserCredentials, SwiftRantError>) -> Void) {
         let resourceURL = URL(string: baseURL + "/users/auth-token?app=3")!
         var request = URLRequest(url: resourceURL)
         
@@ -161,19 +169,19 @@ public class SwiftRant {
                         if let jsonObject = jsonObject {
                             if let jObject = jsonObject as? [String:Any] {
                                 if let error = jObject["error"] as? String {
-                                    completionHandler(error, nil)
+                                    completionHandler(.failure(SwiftRantError(message: error)))
                                     return
                                 }
                                 
-                                completionHandler("An unknown error has occurred.", nil)
+                                completionHandler(.failure(SwiftRantError(message: "An unknown error has occurred.")))
                                 return
                             }
                             
-                            completionHandler("An unknown error has occurred.", nil)
+                            completionHandler(.failure(SwiftRantError(message: "An unknown error has occurred.")))
                             return
                         }
                         
-                        completionHandler("An unknown error has occurred.", nil)
+                        completionHandler(.failure(SwiftRantError(message: "An unknown error has occurred.")))
                         return
                     }
                     
@@ -213,15 +221,15 @@ public class SwiftRant {
                         //UserDefaults.standard.set(password, forKey: "DRPassword")
                     }
                     
-                    completionHandler(nil, token)
+                    completionHandler(.success(token!))
                     return
                 }
                 
-                completionHandler("An unknown error has occurred.", nil)
+                completionHandler(.failure(SwiftRantError(message: "An unknown error has occurred.")))
                 return
             }
             
-            completionHandler("An unknown error has occurred.", nil)
+            completionHandler(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
@@ -240,23 +248,26 @@ public class SwiftRant {
     
     /// Gets a personalized rant feed for the user.
     ///
-    /// - parameter token: The user's token. set to `nil`if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter skip: How many rants to skip before loading. Used for pagination/infinite scroll.
-    /// - parameter prevSet: The ``RantFeed/set`` you got in the last fetch. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults, the SwiftRant instance will get the set from the last fetch from User Defaults.
-    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch is successful, the ``RantFeed`` parameter will contain the feed, while the `String` is `nil`. If the fetch is unsuccessful, then the `String` will hold an error message, while the ``RantFeed`` will be `nil`.
-    public func getRantFeed(token: UserCredentials?, skip: Int, prevSet: String?, completionHandler: @escaping ((String?, RantFeed?) -> Void)) {
+    /// - Parameters:
+    ///    - token: The user's token. set to `nil`if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - skip: How many rants to skip before loading. Used for pagination/infinite scroll.
+    ///    - prevSet: The ``RantFeed/set`` you got in the last fetch. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults, the SwiftRant instance will get the set from the last fetch from User Defaults.
+    ///    - completionHandler: The completion handler to call when the fetch is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (``RantFeed`` with the personalized rant feed if successful, ``SwiftRantError`` if failed).
+    public func getRantFeed(token: UserCredentials?, skip: Int, prevSet: String?, completionHandler: @escaping (Result<RantFeed, SwiftRantError>) -> Void) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
                 //fatalError("No token was specified!")
                 
-                completionHandler("No devRant access token was specified!", nil)
+                completionHandler(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
             let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
             guard let storedToken = storedToken else {
-                completionHandler("Could not find devRant access token in Keychain during token validation!", nil)
+                completionHandler(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
                 return
             }
             
@@ -266,16 +277,16 @@ public class SwiftRant {
                 var errorMessage: String?
                 
                 guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
-                    completionHandler("Could not find devRant username/password in Keychain before renewing the token!", nil)
+                    completionHandler(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
                     return
                 }
                 
-                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -283,7 +294,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler(errorMessage, nil)
+                    completionHandler(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -294,7 +305,7 @@ public class SwiftRant {
         
         if shouldUseKeychainAndUserDefaults {
             guard let currentToken = currentToken else {
-                completionHandler("Failed to get devRant access token from Keychain while building request URL!", nil)
+                completionHandler(.failure(SwiftRantError(message: "Failed to get devRant access token from Keychain while building request URL!")))
                 return
             }
             
@@ -340,19 +351,19 @@ public class SwiftRant {
                         if let jsonObject = jsonObject {
                             if let jObject = jsonObject as? [String:Any] {
                                 if let error = jObject["error"] as? String {
-                                    completionHandler(error, nil)
+                                    completionHandler(.failure(SwiftRantError(message: error)))
                                     return
                                 }
                                 
-                                completionHandler("An unknown error has occurred.", nil)
+                                completionHandler(.failure(SwiftRantError(message: "An unknown error has occurred.")))
                                 return
                             }
                             
-                            completionHandler("An unknown error has occurred.", nil)
+                            completionHandler(.failure(SwiftRantError(message: "An unknown error has occurred.")))
                             return
                         }
                         
-                        completionHandler("An unknown error has occurred.", nil)
+                        completionHandler(.failure(SwiftRantError(message: "An unknown error has occurred.")))
                         return
                     }
                     
@@ -360,14 +371,14 @@ public class SwiftRant {
                         UserDefaults.standard.set(rantFeed!.set, forKey: "DRLastSet")
                     }
                     
-                    completionHandler(nil, rantFeed)
+                    completionHandler(.success(rantFeed!))
                     return
                 } else {
-                    completionHandler("An unknown error has occurred.", nil)
+                    completionHandler(.failure(SwiftRantError(message: "An unknown error has occurred.")))
                     return
                 }
             } else {
-                completionHandler("An unknown error has occurred.", nil)
+                completionHandler(.failure(SwiftRantError(message: "An unknown error has occurred.")))
                 return
             }
         }.resume()
@@ -375,30 +386,46 @@ public class SwiftRant {
     
     /// Get a specific week's Weekly Rant Week rant feed.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter limit: The maximum amount of rants to provide in the response. Default is 20.
-    /// - parameter skip: How many rants to skip before loading. Used for pagination/infinite scroll.
-    /// - parameter week: The week number to fetch. This variable is optional. If you want to get the latest week's rants, skip this variable in the call.
-    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch is successful, the ``RantFeed`` parameter will contain the feed, while the `String` is `nil`. If the fetch is unsuccessful, then the `String` will hold an error message, while the ``RantFeed`` will be `nil`.
-    public func getWeeklyRants(token: UserCredentials?, limit: Int = 20, skip: Int, week: Int = -1, completionHandler: @escaping ((String?, RantFeed?) -> Void)) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - limit: The maximum amount of rants to provide in the response. Default is 20.
+    ///    - skip: How many rants to skip before loading. Used for pagination/infinite scroll.
+    ///    - week: The week number to fetch. This variable is optional. If you want to get the latest week's rants, skip this variable in the call.
+    ///    - completionHandler: The completion handler to call when the fetch is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (``RantFeed`` with the Weekly Rant Week feed if successful, ``SwiftRantError`` if failed).
+    public func getWeeklyRants(token: UserCredentials?, limit: Int = 20, skip: Int, week: Int = -1, completionHandler: @escaping (Result<RantFeed, SwiftRantError>) -> Void) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                fatalError("No token was specified!")
+                //fatalError("No token was specified!")
+                
+                completionHandler(.failure(SwiftRantError(message: "No devRant access token was specified!")))
+                return
             }
         } else {
             let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain!, password: usernameFromKeychain!) { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -406,7 +433,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler(errorMessage, nil)
+                    completionHandler(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -431,46 +458,61 @@ public class SwiftRant {
                     if let jsonObject = jsonObject {
                         if let jObject = jsonObject as? [String:Any] {
                             if let error = jObject["error"] as? String {
-                                completionHandler(error, nil)
+                                completionHandler(.failure(SwiftRantError(message: error)))
                                 return
                             }
                         }
                     }
                 } else {
-                    completionHandler(nil, rantFeed)
+                    completionHandler(.success(rantFeed!))
                     return
                 }
             }
             
-            completionHandler("An unknown error has occurred.", nil)
+            completionHandler(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
     
     /// Get the list of Weekly Rant weeks.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch was successful, the ``WeeklyList`` parameter will hold the list of weeks, while the `String` is `nil`. If the fetch was unsuccessful, then the `String` will hold an error message, while the ``WeeklyList`` will be `nil`.
-    public func getWeekList(token: UserCredentials?, completionHandler: @escaping ((String?, WeeklyList?) -> Void)) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - completionHandler: The completion handler to call when the fetch is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (``WeeklyList`` with the list of weeks if successful, ``SwiftRantError`` if failed).
+    public func getWeekList(token: UserCredentials?, completionHandler: @escaping (Result<WeeklyList, SwiftRantError>) -> Void) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler("No devRant access token was specified!", nil)
+                //fatalError("No token was specified!")
+                
+                completionHandler(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -478,7 +520,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler(errorMessage, nil)
+                    completionHandler(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -503,49 +545,68 @@ public class SwiftRant {
                     if let jsonObject = jsonObject {
                         if let jObject = jsonObject as? [String:Any] {
                             if let error = jObject["error"] as? String {
-                                completionHandler(error, nil)
+                                completionHandler(.failure(SwiftRantError(message: error)))
                                 return
                             }
                         }
                     } else {
-                        completionHandler(nil, weekList)
+                        completionHandler(.success(weekList!))
                         return
                     }
                 }
             }
             
-            completionHandler("An unknown error has occurred.", nil)
+            completionHandler(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
     
     /// Get the notification feed for the current user.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter lastCheckTime: The last Unix Timestamp at which the notifications were last checked at. Set to `nil` is the SwiftRant instance was configured to use Keychain and User Defaults, or if you set `shouldGetNewNotifs` to `false`.
-    /// - parameter shouldGetNewNotifs: Whether or not the function should retrieve the latest notifications since the Unix Timestamp stored in User Defaults or `lastCheckTime`. If set to `false` and the SwiftRant instance was configured to use the Keychain and User Defaults, set `lastCheckTime` to `nil`. If set to `true` and the SwiftRant instance was NOT configured to use the Keychain and User Defaults, set `lastCheckTime` to the last Unix Timestamp at which the notifications were fetched last time.
-    /// - parameter category: The category of notifications that the function should return.
-    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch was successful, the ``Notifications`` parameter will hold the actual notification info, while the `String` is `nil`. If the fetch was unsuccessful, then the `String` will hold an error message, while the ``Notifications`` will be `nil`.
-    public func getNotificationFeed(token: UserCredentials?, lastCheckTime: Int?, shouldGetNewNotifs: Bool, category: Notifications.Categories, completionHandler: @escaping ((String?, Notifications?) -> Void)) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - lastCheckTime: The last Unix Timestamp at which the notifications were last checked at. Set to `nil` is the SwiftRant instance was configured to use Keychain and User Defaults, or if you set `shouldGetNewNotifs` to `false`.
+    ///    - shouldGetNewNotifs: Whether or not the function should retrieve the latest notifications since the Unix Timestamp stored in User Defaults or `lastCheckTime`.
+    ///
+    ///         If set to `false` and the SwiftRant instance was configured to use the Keychain and User Defaults, set `lastCheckTime` to `nil`.
+    ///
+    ///         If set to `true` and the SwiftRant instance was NOT configured to use the Keychain and User Defaults, set `lastCheckTime` to the last Unix Timestamp at which the notifications were fetched last time.
+    ///    - category: The category of notifications that the function should return.
+    ///    - completionHandler: The completion handler to call when the fetch is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (``Notifications`` with the notification list info if successful, ``SwiftRantError`` if failed).
+    public func getNotificationFeed(token: UserCredentials?, lastCheckTime: Int?, shouldGetNewNotifs: Bool, category: Notifications.Categories, completionHandler: @escaping (Result<Notifications, SwiftRantError>) -> Void) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler("No devRant access token was specified!", nil)
+                //fatalError("No token was specified!")
+                
+                completionHandler(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -553,7 +614,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler(errorMessage, nil)
+                    completionHandler(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -579,54 +640,73 @@ public class SwiftRant {
                     if let jsonObject = jsonObject {
                         if let jObject = jsonObject as? [String:Any] {
                             if let error = jObject["error"] as? String {
-                                completionHandler(error, nil)
+                                completionHandler(.failure(SwiftRantError(message: error)))
                                 return
                             }
                         }
                         
-                        completionHandler("An unknown error has occurred.", nil)
+                        completionHandler(.failure(SwiftRantError(message: "An unknown error has occurred.")))
                         return
                     }
                     
-                    completionHandler("An unknown error has occurred.", nil)
+                    completionHandler(.failure(SwiftRantError(message: "An unknown error has occurred.")))
                     return
                 } else {
-                    completionHandler(nil, notificationResult!.data)
+                    completionHandler(.success(notificationResult!.data))
                     return
                 }
             }
             
-            completionHandler("An unknown error has occurred.", nil)
+            completionHandler(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
     
     /// Get a specific rant with a given ID.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter id: The ID of the rant to fetch.
-    /// - parameter lastCommentID: If set to a valid comment ID that exists in the rant's comments, the function will get all the comments that were posted after the comment with the given ID.
-    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch was successful, the ``Rant`` parameter will hold the actual rant info, the ``Comment`` array will hold all the comments attached to the ``Rant`` and the `String` will be `nil`. If the fetch was unsuccessful, then the `String` will hold an error message, and the ``Rant`` and ``Comment`` will both be `nil`.
-    public func getRantFromID(token: UserCredentials?, id: Int, lastCommentID: Int?, completionHandler: ((String?, Rant?, [Comment]?) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - id: The ID of the rant to fetch.
+    ///    - lastCommentID: If set to a valid comment ID that exists in the rant's comments, the function will get all the comments that were posted after the comment with the given ID.
+    ///    - completionHandler: The completion handler to call when the fetch is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request.
+    ///
+    ///         If the fetch was successful, then the result will contain a `Tuple` of a single ``Rant`` with the rant info and a ``Comment`` array with all the comments attached to the rant.
+    ///
+    ///         If the fetch was a failure, then the result will contain a ``SwiftRantError``.
+    public func getRantFromID(token: UserCredentials?, id: Int, lastCommentID: Int?, completionHandler: ((Result<(Rant, [Comment]), SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", nil, nil)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -634,8 +714,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, nil, nil)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -662,16 +741,16 @@ public class SwiftRant {
                     if let jsonObject = jsonObject {
                         if let jObject = jsonObject as? [String:Any] {
                             if let error = jObject["error"] as? String {
-                                completionHandler?(error, nil, nil)
+                                completionHandler?(.failure(SwiftRantError(message: error)))
                                 return
                             }
                         }
                     }
                     
-                    completionHandler?("An unknown error has occurred.", nil, nil)
+                    completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
                     return
                 } else {
-                    completionHandler?(nil, rantResponse?.rant, rantResponse?.comments)
+                    completionHandler?(.success((rantResponse!.rant, rantResponse!.comments)))
                     return
                 }
             }
@@ -680,29 +759,44 @@ public class SwiftRant {
     
     /// Gets a single comment by ID.
     ///
-    /// - parameter id: The ID of the comment to fetch.
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch was successful, the `String?` parameter of the function will contain `nil` and the ``Comment`` parameter of the function will contain the fetched comment. If the fetch was unsuccessful, the `String?` parameter will contain an error message, and the ``Comment`` parameter will contain `nil`.
-    public func getCommentFromID(_ id: Int, token: UserCredentials?, completionHandler: ((String?, Comment?) -> Void)?) {
+    /// - Parameters:
+    ///    - id: The ID of the comment to fetch.
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - completionHandler: The completion handler to call when the fetch is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (``Comment`` with the fetched comment if successful, ``SwiftRantError`` if failed).
+    public func getCommentFromID(_ id: Int, token: UserCredentials?, completionHandler: ((Result<Comment, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", nil)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -710,8 +804,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, nil)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -736,47 +829,62 @@ public class SwiftRant {
                     if let jsonObject = jsonObject {
                         if let jObject = jsonObject as? [String:Any] {
                             if let error = jObject["error"] as? String {
-                                completionHandler?(error, nil)
+                                completionHandler?(.failure(SwiftRantError(message: error)))
                                 return
                             }
                         }
                     }
                 } else {
-                    completionHandler?(nil, comment?.comment)
+                    completionHandler?(.success(comment!.comment!))
                     return
                 }
             }
             
-            completionHandler?("An unknown error has occurred.", nil)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
     
     /// Gets a personal rant feed based on the user's subscriptions and the activity of the users the user has subscribed to.
     ///
-    /// - parameter token: The user's token. set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter lastEndCursor: The ``SubscribedFeed/PageInfo-swift.struct/endCursor`` you got from the last fetch. Set to `nil` if the SwiftRant instance was configured to use the Keychain and UserDefaults. the SwiftRant instance will get the last end cursor from the last fetch from User Defaults.
-    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch was successful, the `String?` parameter of the function will contain `nil` and the ``SubscribedFeed`` parameter of the function will contain the fetched Subscribed feed. If the fetch was unsuccessful, the `String?` parameter will contain an error message, and the ``SubscribedFeed`` parameter will contain `nil`.
-    public func getSubscribedFeed(_ token: UserCredentials?, lastEndCursor: String?, completionHandler: ((String?, SubscribedFeed?) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - lastEndCursor: The ``SubscribedFeed/PageInfo-swift.struct/endCursor`` you got from the last fetch. Set to `nil` if the SwiftRant instance was configured to use the Keychain and UserDefaults. the SwiftRant instance will get the last end cursor from the last fetch from User Defaults.
+    ///    - completionHandler: The completion handler to call when the fetch is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (``SubscribedFeed`` with the fetched Subscribed feed if successful, ``SwiftRantError`` if failed).
+    public func getSubscribedFeed(_ token: UserCredentials?, lastEndCursor: String?, completionHandler: ((Result<SubscribedFeed, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", nil)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -784,8 +892,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, nil)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -811,7 +918,7 @@ public class SwiftRant {
                     if let jsonObject = jsonObject {
                         if let jObject = jsonObject as? [String: Any] {
                             if let error = jObject["error"] as? String {
-                                completionHandler?(error, nil)
+                                completionHandler?(.failure(SwiftRantError(message: error)))
                                 return
                             }
                         }
@@ -819,24 +926,27 @@ public class SwiftRant {
                 } else {
                     UserDefaults.standard.set(subscribedFeed!.pageInfo.endCursor, forKey: "DRLastEndCursor")
                     
-                    completionHandler?(nil, subscribedFeed)
+                    completionHandler?(.success(subscribedFeed!))
                     return
                 }
                 
-                completionHandler?("An unknown error has occurred.", nil)
+                completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
                 return
             }
             
-            completionHandler?("An unknown error has occurred.", nil)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
     
     /// Retrieves the ID of a user with a specified username
     ///
-    /// - parameter username: The username to get the ID for.
-    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch was successful, the `String?` parameter of the function will contain `nil`, and the `Int?` parameter of the function will contain the ID for the given username. If the fetch was unsuccessful, the `String?` parameter will contain an error message, and the `Int?` will contain `nil`.
-    public func getUserID(of username: String, completionHandler: ((String?, Int?) -> Void)?) {
+    /// - Parameters:
+    ///    - username: The username to get the ID for.
+    ///    - completionHandler: The completion handler to call when the fetch is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Int` with the ID of the given username if successful, ``SwiftRantError`` if failed).
+    public func getUserID(of username: String, completionHandler: ((Result<Int, SwiftRantError>) -> Void)?) {
         let resourceURL = URL(string: "\(baseURL)/get-user-id?app=3&username=\(username)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
         
         var request = URLRequest(url: resourceURL)
@@ -852,10 +962,10 @@ public class SwiftRant {
                     if let jObject = jsonObject as? [String: Any] {
                         if let success = jObject["success"] as? Bool {
                             if success {
-                                completionHandler?(nil, jObject["user_id"] as? Int)
+                                completionHandler?(.success(jObject["user_id"] as! Int))
                                 return
                             } else {
-                                completionHandler?("User doesn't exist!", nil)
+                                completionHandler?(.failure(SwiftRantError(message: "User doesn't exist!")))
                                 return
                             }
                         }
@@ -863,36 +973,51 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error has occurred.", nil)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
         }.resume()
     }
     
     /// Get a user's profile data.
+    /// - Parameters:
+    ///    - id: The ID of the user whose data will be fetched.
+    ///    - token: The user's token. set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - userContentType: The type of content created by the user to be fetched.
+    ///    - skip: The amount of content to be skipped on. Useful for pagination/infinite scroll.
+    ///    - completionHandler: The completion handler to call when the fetch is complete.
     ///
-    /// - parameter id: The ID of the user whose data will be fetched.
-    /// - parameter userContentType: The type of content created by the user to be fetched.
-    /// - parameter skip: The amount of content to be skipped on. Useful for pagination/infinite scroll.
-    /// - parameter completionHandler: A function that will run after the fetch is completed. If the fetch was successful, the `String?` parameter of the function will contain `nil`, and the ``Profile`` parameter of the function will hold the fetched profile information. If the fetch was unsuccessful, the `String?` parameter of the function will contain an error message, and the ``Profile`` parameter of the function will contain `nil`.
-    public func getProfileFromID(_ id: Int, token: UserCredentials?, userContentType: Profile.ProfileContentTypes, skip: Int, completionHandler: ((String?, Profile?) -> Void)?) {
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (``Profile`` with the fetched profile information if successful, ``SwiftRantError`` if failed).
+    public func getProfileFromID(_ id: Int, token: UserCredentials?, userContentType: Profile.ProfileContentTypes, skip: Int, completionHandler: ((Result<Profile, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", nil)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -900,8 +1025,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, nil)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -927,53 +1051,68 @@ public class SwiftRant {
                     if let jsonObject = jsonObject {
                         if let jObject = jsonObject as? [String:Any] {
                             if let error = jObject["error"] as? String {
-                                completionHandler?(error, nil)
+                                completionHandler?(.failure(SwiftRantError(message: error)))
                                 return
                             }
                         }
                     }
                 } else {
-                    completionHandler?(nil, profileResponse?.profile)
+                    completionHandler?(.success(profileResponse!.profile!))
                     return
                 }
                 
-                completionHandler?("An unknown error has occurred.", nil)
+                completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
                 return
             }
             
-            completionHandler?("An unknown error has occurred.", nil)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
     
     /// Retrieves a set of avatar customization options listed under a specific type of customization.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter type: The type of customization to retrieve the options for.
-    /// - parameter subType: The sub-type of the type of customization to retrieve the options for. Not all customization types have a subtype, so this parameter is optional. If the type does not contain a sub-type, set `subOption` to `nil`.
-    /// - parameter currentImageID: The ID of the current avatar of the user.
-    /// - parameter shouldGetPossibleOptions: Whether or not the server should return the entire list of the different types and sub-types of customizations for a devRant avatar, alongside the query.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the ``AvatarCustomizationResults`` parameter of the function will contain the query's results. If the request was unsuccessful, the `String?` parameter will contain an error message, and the ``AvatarCustomizationResults`` will contain `nil`.
-    public func getAvatarCustomizationOptions(_ token: UserCredentials?, type: String, subType: Int?, currentImageID: String, shouldGetPossibleOptions: Bool, completionHandler: ((String?, AvatarCustomizationResults?) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - type: The type of customization to retrieve the options for.
+    ///    - subType: The sub-type of the type of customization to retrieve the options for. Not all customization types have a subtype, so this parameter is optional. If the type does not contain a sub-type, set `subOption` to `nil`.
+    ///    - currentImageID: The ID of the current avatar of the user.
+    ///    - shouldGetPossibleOptions: Whether or not the server should return the entire list of the different types and sub-types of customizations for a devRant avatar, alongside the query.
+    ///    - completionHandler: The completion handler to call when the fetch is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (``AvatarCustomizationResults`` with the query's results if successful, ``SwiftRantError`` if failed).
+    public func getAvatarCustomizationOptions(_ token: UserCredentials?, type: String, subType: Int?, currentImageID: String, shouldGetPossibleOptions: Bool, completionHandler: ((Result<AvatarCustomizationResults, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", nil)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -981,8 +1120,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, nil)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -1001,7 +1139,7 @@ public class SwiftRant {
                 let results = try? JSONDecoder().decode(AvatarCustomizationResults.self, from: data)
                 
                 if results != nil {
-                    completionHandler?(nil, results)
+                    completionHandler?(.success(results!))
                     return
                 } else {
                     let jsonObject = try? JSONSerialization.jsonObject(with: data, options: [])
@@ -1009,7 +1147,7 @@ public class SwiftRant {
                     if let jsonObject = jsonObject {
                         if let jObject = jsonObject as? [String: Any] {
                             if let error = jObject["error"] as? String {
-                                completionHandler?(error, nil)
+                                completionHandler?(.failure(SwiftRantError(message: error)))
                                 return
                             }
                         }
@@ -1017,7 +1155,7 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error has occurred.", nil)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
@@ -1026,30 +1164,45 @@ public class SwiftRant {
     
     /// Vote on a rant.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter rantID: The ID of the rant to vote on.
-    /// - parameter vote: The vote state. 1 = upvote, 0 = neutral, -1 = downvote.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the ``Rant`` parameter of the function will hold the target rant with updated information. If the request was unsuccessful, the `String?` parameter will contain an error message, and the ``Rant`` will contain `nil`.
-    public func voteOnRant(_ token: UserCredentials?, rantID id: Int, vote: Int, completionHandler: ((String?, Rant?) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - rantID: The ID of the rant to vote on.
+    ///    - vote: The vote state. 1 = upvote, 0 = neutral, -1 = downvote.
+    ///    - completionHandler: The completion handler to call when the request is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (``Rant`` with the updated rant data if successful, ``SwiftRantError`` if failed).
+    public func voteOnRant(_ token: UserCredentials?, rantID id: Int, vote: Int, completionHandler: ((Result<Rant, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", nil)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -1057,8 +1210,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, nil)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -1085,51 +1237,66 @@ public class SwiftRant {
                     if let jsonObject = jsonObject {
                         if let jObject = jsonObject as? [String:Any] {
                             if let error = jObject["error"] as? String {
-                                completionHandler?(error, nil)
+                                completionHandler?(.failure(SwiftRantError(message: error)))
                                 return
                             }
                         }
                     }
                 } else {
-                    completionHandler?(nil, updatedRantInfo?.rant)
+                    completionHandler?(.success(updatedRantInfo!.rant))
                     return
                 }
                 
-                completionHandler?("An unknown error has occurred.", nil)
+                completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
                 return
             }
             
-            completionHandler?("An unknown error has occurred.", nil)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
     
     /// Vote on a comment.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter commentID: The ID of the comment to vote on.
-    /// - parameter vote: The vote state. 1 = upvote, 0 = neutral, -1 = downvote.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String` parameter of the function will contain `nil`, and the ``Comment`` parameter of the function will hold the target comment with updated information. If the request was unsuccessful, the `String?` parameter will contain an error message, and the ``Comment`` will contain `nil`.
-    public func voteOnComment(_ token: UserCredentials?, commentID id: Int, vote: Int, completionHandler: ((String?, Comment?) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - commentID: The ID of the comment to vote on.
+    ///    - vote: The vote state. 1 = upvote, 0 = neutral, -1 = downvote.
+    ///    - completionHandler: The completion handler to call when the request is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (``Comment`` with the updated comment data if successful, ``SwiftRantError`` if failed).
+    public func voteOnComment(_ token: UserCredentials?, commentID id: Int, vote: Int, completionHandler: ((Result<Comment, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", nil)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -1137,8 +1304,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, nil)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -1165,54 +1331,69 @@ public class SwiftRant {
                     if let jsonObject = jsonObject {
                         if let jObject = jsonObject as? [String:Any] {
                             if let error = jObject["error"] as? String {
-                                completionHandler?(error, nil)
+                                completionHandler?(.failure(SwiftRantError(message: error)))
                                 return
                             }
                         }
                     }
                 } else {
-                    completionHandler?(nil, updatedCommentInfo?.comment)
+                    completionHandler?(.success(updatedCommentInfo!.comment!))
                     return
                 }
                 
-                completionHandler?("An unknown error has occurred.", nil)
+                completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
                 return
             }
             
-            completionHandler?("An unknown error has occurred.", nil)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
     
     /// Updates the summary of the user whose token is used.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter aboutSection: The user's about section.
-    /// - parameter skills: The user's list of skills.
-    /// - parameter githubLink: The user's GitHub link.
-    /// - parameter location: The user's location.
-    /// - parameter website: The user's personal website.
-    /// - parameter completionHandler: A function that wil run after the request was completed. If the request was successful, the `String?` parameter of the function will contain `nil`. If the request was unsuccessful, the `String?` parameter of the function will hold an error message.
-    public func editProfileDetails(_ token: UserCredentials?, aboutSection: String?, skills: String?, githubLink: String?, location: String?, website: String?, completionHandler: ((String?) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - aboutSection: The user's about section.
+    ///    - skills: The user's list of skills.
+    ///    - githubLink: The user's GitHub link.
+    ///    - location: The user's location.
+    ///    - website: The user's personal website.
+    ///    - completionHandler: The completion handler to call when the request is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func editProfileDetails(_ token: UserCredentials?, aboutSection: String?, skills: String?, githubLink: String?, location: String?, website: String?, completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!")
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -1220,8 +1401,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -1243,11 +1423,11 @@ public class SwiftRant {
                     if let jObject = jsonObject as? [String:Any] {
                         if let success = jObject["success"] as? Bool {
                             if success {
-                                completionHandler?(nil)
+                                completionHandler?(.success(()))
                                 return
                             } else {
                                 if let error = jObject["error"] as? String {
-                                    completionHandler?(error)
+                                    completionHandler?(.failure(SwiftRantError(message: error)))
                                     return
                                 }
                             }
@@ -1256,39 +1436,54 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error has occurred.")
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
         }.resume()
     }
     
     #if os(iOS) || targetEnvironment(macCatalyst)
     /// Posts a rant to devRant.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter postType: The type of post.
-    /// - parameter content: The text content of the post.
-    /// - parameter tags: The post's associated tags.
-    /// - parameter image: An image to attach to the post.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Int?` parameter of the function will contain the ID of the post. If the the request was unsuccessful, the `String?` parameter will contain an error message, and the `Int?` will contain `nil`.
-    public func postRant(_ token: UserCredentials?, postType: Rant.RantType, content: String, tags: String?, image: UIImage?, completionHandler: ((String?, Int?) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - postType: The type of post.
+    ///    - content: The text content of the post.
+    ///    - tags: The post's associated tags.
+    ///    - image: An image to attach to the post.
+    ///    - completionHandler: The completion handler to call when the request is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Int` with the ID of the rant if successful, ``SwiftRantError`` if failed).
+    public func postRant(_ token: UserCredentials?, postType: Rant.RantType, content: String, tags: String?, image: UIImage?, completionHandler: ((Result<Int, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", nil)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -1296,8 +1491,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, nil)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -1337,10 +1531,10 @@ public class SwiftRant {
                     if let jObject = jsonObject as? [String: Any] {
                         if let success = jObject["success"] as? Bool {
                             if success {
-                                completionHandler?(nil, jObject["rant_id"] as? Int)
+                                completionHandler?(.success(jObject["rant_id"] as! Int))
                                 return
                             } else {
-                                completionHandler?(jObject["error"] as? String, nil)
+                                completionHandler?(.failure(SwiftRantError(message: jObject["error"] as? String ?? "An unknown error has occurred.")))
                                 return
                             }
                         }
@@ -1348,39 +1542,54 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error as occurred.", nil)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error as occurred.")))
             return
         }.resume()
     }
     #else
     /// Posts a rant to devRant.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter postType: The type of the post.
-    /// - parameter content: The text content of the post.
-    /// - parameter tags: The post's associated tags.
-    /// - parameter image: An image to attach to the post.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Int?` parameter of the function will contain the ID of the post. If the request was unsuccessful, the `String?` parameter will contain an error message, and the `Int?` will contain `nil`.
-    public func postRant(_ token: UserCredentials?, postType: Rant.RantType, content: String, tags: String?, image: NSImage?, completionHandler: ((String?, Int?) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - postType: The type of post.
+    ///    - content: The text content of the post.
+    ///    - tags: The post's associated tags.
+    ///    - image: An image to attach to the post.
+    ///    - completionHandler: The completion handler to call when the request is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Int` with the ID of the rant if successful, ``SwiftRantError`` if failed).
+    public func postRant(_ token: UserCredentials?, postType: Rant.RantType, content: String, tags: String?, image: NSImage?, completionHandler: ((Result<Int, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", nil)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -1388,8 +1597,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, nil)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -1429,10 +1637,10 @@ public class SwiftRant {
                     if let jObject = jsonObject as? [String: Any] {
                         if let success = jObject["success"] as? Bool {
                             if success {
-                                completionHandler?(nil, jObject["rant_id"] as? Int)
+                                completionHandler?(.success(jObject["rant_id"] as! Int))
                                 return
                             } else {
-                                completionHandler?(jObject["error"] as? String, nil)
+                                completionHandler?(.failure(SwiftRantError(message: jObject["error"] as? String ?? "An unknown error has occurred.")))
                                 return
                             }
                         }
@@ -1440,7 +1648,7 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error has occurred.", nil)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
@@ -1448,29 +1656,44 @@ public class SwiftRant {
     
     /// Deletes a post from devRant.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter rantID: The ID of the post or rant to be deleted.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If he request was unsuccessful, the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
-    public func deleteRant(_ token: UserCredentials?, rantID: Int, completionHandler: ((String?, Bool) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - rantID: The ID of the post or rant to be deleted.
+    ///    - completionHandler: The completion handler to call when the request is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func deleteRant(_ token: UserCredentials?, rantID: Int, completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", false)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -1478,8 +1701,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, false)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -1499,10 +1721,10 @@ public class SwiftRant {
                     if let jObject = jsonObject as? [String: Any] {
                         if let success = jObject["success"] as? Bool {
                             if success {
-                                completionHandler?(nil, success)
+                                completionHandler?(.success(()))
                                 return
                             } else {
-                                completionHandler?(jObject["error"] as? String, false)
+                                completionHandler?(.failure(SwiftRantError(message: jObject["error"] as? String ?? "An unknown error has occurred.")))
                                 return
                             }
                         }
@@ -1510,36 +1732,51 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error has occurred.", false)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
     
     /// Marks a rant as a favorite.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter rantID: The ID of the post or rant to be marked as favorite.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If the request was unsuccessful. the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
-    public func favoriteRant(_ token: UserCredentials?, rantID: Int, completionHandler: ((String?, Bool) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - rantID: The ID of the post or rant to be marked as favorite.
+    ///    - completionHandler: The completion handler to call when the request is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func favoriteRant(_ token: UserCredentials?, rantID: Int, completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", false)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -1547,8 +1784,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, false)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -1569,10 +1805,10 @@ public class SwiftRant {
                     if let jObject = jsonObject as? [String: Any] {
                         if let success = jObject["success"] as? Bool {
                             if success {
-                                completionHandler?(nil, success)
+                                completionHandler?(.success(()))
                                 return
                             } else {
-                                completionHandler?(jObject["error"] as? String, false)
+                                completionHandler?(.failure(SwiftRantError(message: jObject["error"] as? String ?? "An unknown error has occurred.")))
                                 return
                             }
                         }
@@ -1580,35 +1816,50 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error has occurred.", false)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
         }.resume()
     }
     
     /// Unmarks a rant as a favorite.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter rantID: The ID of the post or rant to be unmarked as favorite.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If the request was unsuccessful. the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
-    public func unfavoriteRant(_ token: UserCredentials?, rantID: Int, completionHandler: ((String?, Bool) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - rantID: The ID of the post or rant to be unmarked as favorite.
+    ///    - completionHandler: The completion handler to call when the request is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func unfavoriteRant(_ token: UserCredentials?, rantID: Int, completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", false)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -1616,8 +1867,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, false)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -1637,10 +1887,10 @@ public class SwiftRant {
                     if let jObject = jsonObject as? [String: Any] {
                         if let success = jObject["success"] as? Bool {
                             if success {
-                                completionHandler?(nil, success)
+                                completionHandler?(.success(()))
                                 return
                             } else {
-                                completionHandler?(jObject["error"] as? String, false)
+                                completionHandler?(.failure(SwiftRantError(message: jObject["error"] as? String ?? "An unknown error has occurred.")))
                                 return
                             }
                         }
@@ -1648,40 +1898,55 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error has occurred.", false)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
         }.resume()
     }
     
     #if os(iOS) || targetEnvironment(macCatalyst)
     /// Edits a posted rant.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter rantID: The ID of the rant to be edited.
-    /// - parameter postType: The new type of the post.
-    /// - parameter content: The new text content of the post.
-    /// - parameter tags: The post's new associated tags.
-    /// - parameter image: A new image to attach to the post.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If the request was unsuccessful, the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
-    public func editRant(_ token: UserCredentials?, rantID: Int, postType: Rant.RantType, content: String, tags: String?, image: UIImage?, completionHandler: ((String?, Bool) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - rantID: The ID of the rant to be edited.
+    ///    - postType: The new type of the post.
+    ///    - content: The new text content of the post.
+    ///    - tags: The post's new associated tags.
+    ///    - image: A new image to attach to the post.
+    ///    - completionHandler: The completion handler to call when the request is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func editRant(_ token: UserCredentials?, rantID: Int, postType: Rant.RantType, content: String, tags: String?, image: UIImage?, completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", false)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -1689,8 +1954,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, false)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -1730,10 +1994,10 @@ public class SwiftRant {
                     if let jObject = jsonObject as? [String: Any] {
                         if let success = jObject["success"] as? Bool {
                             if success {
-                                completionHandler?(nil, true)
+                                completionHandler?(.success(()))
                                 return
                             } else {
-                                completionHandler?(jObject["error"] as? String, false)
+                                completionHandler?(.failure(SwiftRantError(message: jObject["error"] as? String ?? "An unknown error has occurred.")))
                                 return
                             }
                         }
@@ -1741,40 +2005,55 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error has occurred.", false)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
     #else
     /// Edits a posted rant.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter rantID: The ID of the rant to be edited.
-    /// - parameter postType: The new type of the post.
-    /// - parameter content: The new text content of the post.
-    /// - parameter tags: The post's new associated tags.
-    /// - parameter image: A new image to attach to the post.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If the request was unsuccessful, the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
-    public func editRant(_ token: UserCredentials?, rantID: Int, postType: Rant.RantType, content: String, tags: String?, image: NSImage?, completionHandler: ((String?, Bool) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - rantID: The ID of the rant to be edited.
+    ///    - postType: The new type of the post.
+    ///    - content: The new text content of the post.
+    ///    - tags: The post's new associated tags.
+    ///    - image: A new image to attach to the post.
+    ///    - completionHandler: The completion handler to call when the request is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func editRant(_ token: UserCredentials?, rantID: Int, postType: Rant.RantType, content: String, tags: String?, image: NSImage?, completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", false)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -1782,8 +2061,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, false)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -1823,10 +2101,10 @@ public class SwiftRant {
                     if let jObject = jsonObject as? [String: Any] {
                         if let success = jObject["success"] as? Bool {
                             if success {
-                                completionHandler?(nil, true)
+                                completionHandler?(.success(()))
                                 return
                             } else {
-                                completionHandler?(jObject["error"] as? String, false)
+                                completionHandler?(.failure(SwiftRantError(message: jObject["error"] as? String ?? "An unknown error has occurred.")))
                                 return
                             }
                         }
@@ -1834,7 +2112,7 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error has occurred.", false)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
@@ -1843,31 +2121,46 @@ public class SwiftRant {
     #if os(iOS) || targetEnvironment(macCatalyst)
     /// Posts a comment under a specific rant.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter rantID: The ID of the rant to post a comment under.
-    /// - parameter content: The text content of the comment.
-    /// - parameter image: An image to attach to the comment.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If the request was unsuccessful, the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
-    public func postComment(_ token: UserCredentials?, rantID: Int, content: String, image: UIImage?, completionHandler: ((String?, Bool) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - rantID: The ID of the rant to post a comment under.
+    ///    - content: The text content of the comment.
+    ///    - image: An image to attach to the comment.
+    ///    - completionHandler: The completion handler to call when the request is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func postComment(_ token: UserCredentials?, rantID: Int, content: String, image: UIImage?, completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", false)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -1875,8 +2168,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, false)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -1915,10 +2207,10 @@ public class SwiftRant {
                     if let jObject = jsonObject as? [String: Any] {
                         if let success = jObject["success"] as? Bool {
                             if success {
-                                completionHandler?(nil, true)
+                                completionHandler?(.success(()))
                                 return
                             } else {
-                                completionHandler?(jObject["error"] as? String, false)
+                                completionHandler?(.failure(SwiftRantError(message: jObject["error"] as? String ?? "An unknown error has occurred.")))
                                 return
                             }
                         }
@@ -1926,38 +2218,53 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error has occurred.", false)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
     #else
     /// Posts a comment under a specific rant.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter rantID: The ID of the rant to post a comment under.
-    /// - parameter content: The text content of the comment.
-    /// - parameter image: An image to attach to the comment.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If the request was unsuccessful, the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
-    public func postComment(_ token: UserCredentials?, rantID: Int, content: String, image: NSImage?, completionHandler: ((String?, Bool) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - rantID: The ID of the rant to post a comment under.
+    ///    - content: The text content of the comment.
+    ///    - image: An image to attach to the comment.
+    ///    - completionHandler: The completion handler to call when the request is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func postComment(_ token: UserCredentials?, rantID: Int, content: String, image: NSImage?, completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", false)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -1965,8 +2272,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, false)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -2005,10 +2311,10 @@ public class SwiftRant {
                     if let jObject = jsonObject as? [String: Any] {
                         if let success = jObject["success"] as? Bool {
                             if success {
-                                completionHandler?(nil, true)
+                                completionHandler?(.success(()))
                                 return
                             } else {
-                                completionHandler?(jObject["error"] as? String, false)
+                                completionHandler?(.failure(SwiftRantError(message: jObject["error"] as? String ?? "An unknown error has occurred.")))
                                 return
                             }
                         }
@@ -2016,7 +2322,7 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error has occurred.", false)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
@@ -2025,31 +2331,46 @@ public class SwiftRant {
     #if os(iOS) || targetEnvironment(macCatalyst)
     /// Edits a posted comment.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter commentID: The ID of the comment to be edited.
-    /// - parameter content: The new text content of the comment.
-    /// - parameter image: A new image to attach to the comment.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If the request was unsuccessful, the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
-    public func editComment(_ token: UserCredentials?, commentID: Int, content: String, image: UIImage?, completionHandler: ((String?, Bool) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - commentID: The ID of the comment to be edited.
+    ///    - content: The new text content of the comment.
+    ///    - image: A new image to attach to the comment.
+    ///    - completionHandler: The completion handler to call when the request is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func editComment(_ token: UserCredentials?, commentID: Int, content: String, image: UIImage?, completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", false)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -2057,8 +2378,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, false)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -2095,10 +2415,10 @@ public class SwiftRant {
                     if let jObject = jsonObject as? [String: Any] {
                         if let success = jObject["success"] as? Bool {
                             if success {
-                                completionHandler?(nil, true)
+                                completionHandler?(.success(()))
                                 return
                             } else {
-                                completionHandler?(jObject["error"] as? String, false)
+                                completionHandler?(.failure(SwiftRantError(message: jObject["error"] as? String ?? "An unknown error has occurred.")))
                                 return
                             }
                         }
@@ -2106,38 +2426,53 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error has occurred.", false)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
     #else
     /// Edits a posted comment.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter commentID: The ID of the comment to be edited.
-    /// - parameter content: The new text content of the comment.
-    /// - parameter image: A new image to attach to the comment.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If the request was unsuccessful, the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
-    public func editComment(_ token: UserCredentials?, commentID: Int, content: String, image: NSImage?, completionHandler: ((String?, Bool) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - commentID: The ID of the comment to be edited.
+    ///    - content: The new text content of the comment.
+    ///    - image: A new image to attach to the comment.
+    ///    - completionHandler: The completion handler to call when the request is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func editComment(_ token: UserCredentials?, commentID: Int, content: String, image: NSImage?, completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", false)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -2145,8 +2480,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, false)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -2183,10 +2517,10 @@ public class SwiftRant {
                     if let jObject = jsonObject as? [String: Any] {
                         if let success = jObject["success"] as? Bool {
                             if success {
-                                completionHandler?(nil, true)
+                                completionHandler?(.success(()))
                                 return
                             } else {
-                                completionHandler?(jObject["error"] as? String, false)
+                                completionHandler?(.failure(SwiftRantError(message: jObject["error"] as? String ?? "An unknown error has occurred.")))
                                 return
                             }
                         }
@@ -2194,7 +2528,7 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error has occurred.", false)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
@@ -2202,29 +2536,44 @@ public class SwiftRant {
     
     /// Deletes an existing comment.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter commentID: The ID of the comment to be deleted.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If the request was unsuccessful, the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
-    public func deleteComment(_ token: UserCredentials?, commentID: Int, completionHandler: ((String?, Bool) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - commentID: The ID of the comment to be deleted.
+    ///    - completionHandler: The completion handler to call when the request is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func deleteComment(_ token: UserCredentials?, commentID: Int, completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", false)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -2232,8 +2581,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, false)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -2253,10 +2601,10 @@ public class SwiftRant {
                     if let jObject = jsonObject as? [String: Any] {
                         if let success = jObject["success"] as? Bool {
                             if success {
-                                completionHandler?(nil, true)
+                                completionHandler?(.success(()))
                                 return
                             } else {
-                                completionHandler?(jObject["error"] as? String, false)
+                                completionHandler?(.failure(SwiftRantError(message: jObject["error"] as? String ?? "An unknown error has occurred.")))
                                 return
                             }
                         }
@@ -2264,36 +2612,51 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error has occurred.", false)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
     
     /// Updates the avatar image for the given user.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter fullImageID: The ID of the new avatar image (a file name with the extension of .png).
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If the request was unsuccessful, the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
-    public func confirmAvatarCustomization(_ token: UserCredentials?, fullImageID: String, completionHandler: ((String?, Bool) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - fullImageID: The ID of the new avatar image (a file name with the extension of .png).
+    ///    - completionHandler: The completion handler to call when the request is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func confirmAvatarCustomization(_ token: UserCredentials?, fullImageID: String, completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", false)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -2301,8 +2664,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, false)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -2324,10 +2686,10 @@ public class SwiftRant {
                     if let jObject = jsonObject as? [String: Any] {
                         if let success = jObject["success"] as? Bool {
                             if success {
-                                completionHandler?(nil, true)
+                                completionHandler?(.success(()))
                                 return
                             } else {
-                                completionHandler?(jObject["error"] as? String, false)
+                                completionHandler?(.failure(SwiftRantError(message: jObject["error"] as? String ?? "An unknown error has occurred.")))
                                 return
                             }
                         }
@@ -2335,35 +2697,50 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error has occurred.", false)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
             return
         }.resume()
     }
     
     /// Marks all unread notifications as read.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If the request was unsuccessful, the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
-    public func clearNotifications(_ token: UserCredentials?, completionHandler: ((String?, Bool) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - completionHandler: The completion handler to call when the request is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func clearNotifications(_ token: UserCredentials?, completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", false)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -2371,8 +2748,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, false)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -2392,10 +2768,10 @@ public class SwiftRant {
                     if let jObject = jsonObject as? [String: Any] {
                         if let success = jObject["success"] as? Bool {
                             if success {
-                                completionHandler?(nil, true)
+                                completionHandler?(.success(()))
                                 return
                             } else {
-                                completionHandler?(jObject["error"] as? String, false)
+                                completionHandler?(.failure(SwiftRantError(message: jObject["error"] as? String ?? "An unknown error has occurred.")))
                                 return
                             }
                         }
@@ -2403,35 +2779,50 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error has occurred.", false)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
         }.resume()
     }
     
     /// Subscribes to a user with the specified ID.
     ///
-    /// - parameter token: The user's token. set to `nil`if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter userID: The ID of the user to subscribe to.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If the request was unsuccessful, the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
-    public func subscribeToUser(_ token: UserCredentials?, userID: Int, completionHandler: ((String?, Bool) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. set to `nil`if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - userID: The ID of the user to subscribe to.
+    ///    - completionHandler: The completion handler to call when the request is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func subscribeToUser(_ token: UserCredentials?, userID: Int, completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", false)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -2439,8 +2830,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, false)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -2462,10 +2852,10 @@ public class SwiftRant {
                     if let jObject = jsonObject as? [String: Any] {
                         if let success = jObject["success"] as? Bool {
                             if success {
-                                completionHandler?(nil, true)
+                                completionHandler?(.success(()))
                                 return
                             } else {
-                                completionHandler?(jObject["error"] as? String, false)
+                                completionHandler?(.failure(SwiftRantError(message: jObject["error"] as? String ?? "An unknown error has occurred.")))
                                 return
                             }
                         }
@@ -2473,35 +2863,50 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error has occurred.", false)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
         }.resume()
     }
     
     /// Unsubscribes from a user with the specified ID.
     ///
-    /// - parameter token: The user's token. set to `nil`if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter userID: The ID of the user to unsubscribe to.
-    /// - parameter completionHandler: A function that will run after the request is completed. If the request was successful, the `String?` parameter of the function will contain `nil`, and the `Bool` parameter of the function will contain `true`. If the request was unsuccessful, the `String?` parameter will contain an error message, and the `Bool` will contain `false`.
-    public func unsubscribeFromUser(_ token: UserCredentials?, userID: Int, completionHandler: ((String?, Bool) -> Void)?) {
+    /// - Parameters:
+    ///    - token: The user's token. set to `nil`if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - userID: The ID of the user to unsubscribe to.
+    ///    - completionHandler: The completion handler to call when the request is complete.
+    ///
+    ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func unsubscribeFromUser(_ token: UserCredentials?, userID: Int, completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
-                completionHandler?("No devRant access token was specified!", false)
+                //fatalError("No token was specified!")
+                
+                completionHandler?(.failure(SwiftRantError(message: "No devRant access token was specified!")))
                 return
             }
         } else {
-            let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
+            let storedToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
             
-            if Double(storedToken!.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
+            guard let storedToken = storedToken else {
+                completionHandler?(.failure(SwiftRantError(message: "Could not find devRant access token in Keychain during token validation!")))
+                return
+            }
+            
+            if Double(storedToken.authToken.expireTime) - Double(Date().timeIntervalSince1970) <= 0 {
                 let loginSemaphore = DispatchSemaphore(value: 0)
                 
                 var errorMessage: String?
                 
-                logIn(username: usernameFromKeychain ?? "", password: passwordFromKeychain ?? "") { error, _ in
-                    if error != nil {
-                        errorMessage = error
-                        loginSemaphore.signal()
-                        return
-                    }
+                guard let usernameFromKeychain = usernameFromKeychain, let passwordFromKeychain = passwordFromKeychain else {
+                    completionHandler?(.failure(SwiftRantError(message: "Could not find devRant username/password in Keychain before renewing the token!")))
+                    return
+                }
+                
+                logIn(username: usernameFromKeychain, password: passwordFromKeychain) { result in
+                    if case .failure(let failure) = result {
+                        errorMessage = failure.message
+                    }/* {
+                        
+                    }*/
                     
                     loginSemaphore.signal()
                 }
@@ -2509,8 +2914,7 @@ public class SwiftRant {
                 loginSemaphore.wait()
                 
                 if errorMessage != nil {
-                    completionHandler?(errorMessage, false)
-                    return
+                    completionHandler?(.failure(SwiftRantError(message: errorMessage!)))
                 }
             }
         }
@@ -2530,10 +2934,10 @@ public class SwiftRant {
                     if let jObject = jsonObject as? [String: Any] {
                         if let success = jObject["success"] as? Bool {
                             if success {
-                                completionHandler?(nil, true)
+                                completionHandler?(.success(()))
                                 return
                             } else {
-                                completionHandler?(jObject["error"] as? String, false)
+                                completionHandler?(.failure(SwiftRantError(message: jObject["error"] as? String ?? "An unknown error has occurred.")))
                                 return
                             }
                         }
@@ -2541,7 +2945,7 @@ public class SwiftRant {
                 }
             }
             
-            completionHandler?("An unknown error has occurred.", false)
+            completionHandler?(.failure(SwiftRantError(message: "An unknown error has occurred.")))
         }.resume()
     }
     
@@ -2549,46 +2953,50 @@ public class SwiftRant {
     
     /// Returns an auth token if the username and password are both correct.
     ///
-    /// - Parameter username: The username of the user attempting to log in.
-    /// - Parameter password: The password of the user attempting to log in.
-    /// - returns: A tuple that contains an error in a `String` and the token as a ``UserCredentials``.
+    /// - Parameters:
+    ///    - username: The username of the user attempting to log in.
+    ///    - password: The password of the user attempting to log in.
     ///
-    /// If the authentication is successful, the ``UserCredentials`` in the tuple will hold the actual auth token info, while the `String` in the tuple will be `nil`. If the authentication is unsuccessful, then the `String` in the tuple will hold an error message, while the ``UserCredentials`` in the tuple will be `nil`.
+    /// - returns: A `Result<>` which will contain the result of the request (``UserCredentials`` with the auth token info if successful, ``SwiftRantError`` if failed).
     ///
     /// If you called this method while initializing ``SwiftRant`` while setting `shouldUseKeychainAndUserDefaults` with `true`, the username, password and access token will be stored in the Keychain securely.
-    public func logIn(username: String, password: String) async -> (String?, UserCredentials?) {
+    public func logIn(username: String, password: String) async -> Result<UserCredentials, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.logIn(username: username, password: password) { error, credentials in
-                continuation.resume(returning: (error, credentials))
+            self.logIn(username: username, password: password) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     
     /// Gets a personalized rant feed for the user.
     ///
-    /// - parameter token: The user's token. set to `nil`if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter skip: How many rants to skip before loading. Used for pagination/infinite scroll.
-    /// - parameter prevSet: The ``RantFeed/set`` you got in the last fetch. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults, the SwiftRant instance will get the set from the last fetch from User Defaults.
-    /// - returns: A tuple that contains an error in a `String` and the feed as a ``RantFeed``. If the fetch is successful, the ``RantFeed`` in the tuple will contain the feed, while the `String` in the tuple is `nil`. If the fetch is unsuccessful, then the `String` in the tuple will hold an error message, while the ``RantFeed`` in the tuple will be `nil`.
-    public func getRantFeed(token: UserCredentials?, skip: Int, prevSet: String?) async -> (String?, RantFeed?) {
+    /// - Parameters:
+    ///    - token: The user's token. set to `nil`if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - skip: How many rants to skip before loading. Used for pagination/infinite scroll.
+    ///    - prevSet: The ``RantFeed/set`` you got in the last fetch. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults, the SwiftRant instance will get the set from the last fetch from User Defaults.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (``RantFeed`` with the personalized rant feed if successful, ``SwiftRantError`` if failed).
+    public func getRantFeed(token: UserCredentials?, skip: Int, prevSet: String?) async -> Result<RantFeed, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.getRantFeed(token: token, skip: skip, prevSet: prevSet) { error, feed in
-                continuation.resume(returning: (error, feed))
+            self.getRantFeed(token: token, skip: skip, prevSet: prevSet) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     
     /// Get a specific week's Weekly Rant Week rant feed.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter limit: The maximum amount of rants to provide in the response. Default is 20.
-    /// - parameter skip: How many rants to skip before loading. Used for pagination/infinite scroll.
-    /// - parameter week: The week number to fetch.
-    /// - returns: A tuple that contains an error in a `String` and the feed as a ``RantFeed``. If the fetch is successful, the ``RantFeed`` in the tuple will contain the feed, while the `String` in the tuple is `nil`. If the fetch is unsuccessful, then the `String` in the tuple will hold an error message, while the ``RantFeed`` in the tuple will be `nil`.
-    public func getWeeklyRants(token: UserCredentials?, limit: Int = 20, skip: Int, week: Int) async -> (String?, RantFeed?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - limit: The maximum amount of rants to provide in the response. Default is 20.
+    ///    - skip: How many rants to skip before loading. Used for pagination/infinite scroll.
+    ///    - week: The week number to fetch.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (``RantFeed`` with the Weekly Rant Week feed if successful, ``SwiftRantError`` if failed).
+    public func getWeeklyRants(token: UserCredentials?, limit: Int = 20, skip: Int, week: Int) async -> Result<RantFeed, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.getWeeklyRants(token: token, limit: limit, skip: skip, week: week) { error, feed in
-                continuation.resume(returning: (error, feed))
+            self.getWeeklyRants(token: token, limit: limit, skip: skip, week: week) { result in
+                continuation.resume(returning: result)
             }
         }
     }
@@ -2596,66 +3004,83 @@ public class SwiftRant {
     /// Get the list of Weekly Rant weeks.
     ///
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - returns: A tuple that contains an error in a `String` and the list as a ``WeeklyList``. If the fetch is successful, the ``WeeklyList`` in the tuple will contain the list, while the `String` in the tuple is `nil`. If the fetch is unsuccessful, then the `String` in the tuple will hold an error message, while the ``WeeklyList`` in the tuple will be `nil`.
-    public func getWeekList(token: UserCredentials?) async -> (String?, WeeklyList?) {
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (``WeeklyList`` with the list of weeks if successful, ``SwiftRantError`` if failed).
+    public func getWeekList(token: UserCredentials?) async -> Result<WeeklyList, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.getWeekList(token: token) { error, list in
-                continuation.resume(returning: (error, list))
+            self.getWeekList(token: token) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     
     /// Get the notification feed for the current user.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter lastCheckTime: The last Unix Timestamp at which the notifications were last checked at. Set to `nil` is the SwiftRant instance was configured to use Keychain and User Defaults, or if you set `shouldGetNewNotifs` to `false`.
-    /// - parameter shouldGetNewNotifs: Whether or not the function should retrieve the latest notifications since the Unix Timestamp stored in User Defaults or `lastCheckTime`. If set to `false` and the SwiftRant instance was configured to use the Keychain and User Defaults, set `lastCheckTime` to `nil`. If set to `true` and the SwiftRant instance was NOT configured to use the Keychain and User Defaults, set `lastCheckTime` to the last Unix Timestamp at which the notifications were fetched last time.
-    /// - parameter category: The category of notifications that the function should return.
-    /// - returns: A tuple that contains an error in a `String` and the notification feed as a ``Notifications``. If the fetch was successful, the ``Notifications`` in the tuple will hold the actual notification info, while the `String` in the tuple will be `nil`. If the fetch was unsuccessful, then the `String` in the tuple will hold an error message, while the ``Notifications`` in the tuple will be `nil`.
-    public func getNotificationFeed(token: UserCredentials?, lastCheckTime: Int?, shouldGetNewNotifs: Bool, category: Notifications.Categories) async -> (String?, Notifications?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - lastCheckTime: The last Unix Timestamp at which the notifications were last checked at. Set to `nil` is the SwiftRant instance was configured to use Keychain and User Defaults, or if you set `shouldGetNewNotifs` to `false`.
+    ///    - shouldGetNewNotifs: Whether or not the function should retrieve the latest notifications since the Unix Timestamp stored in User Defaults or `lastCheckTime`.
+    ///
+    ///         If set to `false` and the SwiftRant instance was configured to use the Keychain and User Defaults, set `lastCheckTime` to `nil`.
+    ///
+    ///         If set to `true` and the SwiftRant instance was NOT configured to use the Keychain and User Defaults, set `lastCheckTime` to the last Unix Timestamp at which the notifications were fetched last time.
+    ///    - category: The category of notifications that the function should return.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (``Notifications`` with the notification list info if successful, ``SwiftRantError`` if failed).
+    public func getNotificationFeed(token: UserCredentials?, lastCheckTime: Int?, shouldGetNewNotifs: Bool, category: Notifications.Categories) async -> Result<Notifications, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.getNotificationFeed(token: token, lastCheckTime: lastCheckTime, shouldGetNewNotifs: shouldGetNewNotifs, category: category) { error, notifications in
-                continuation.resume(returning: (error, notifications))
+            self.getNotificationFeed(token: token, lastCheckTime: lastCheckTime, shouldGetNewNotifs: shouldGetNewNotifs, category: category) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     
     /// Get a specific rant with a given ID.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter id: The ID of the rant to fetch.
-    /// - parameter lastCommentID: If set to a valid comment ID that exists in the rant's comments, the function will get all the comments that were posted after the comment with the given ID.
-    /// - returns: A tuple that contains an error in a `String`, the rant as a ``Rant`` and the rant's comments as an array of ``Comment``. If the fetch was successful, the ``Rant`` in the tuple will hold the actual rant info, the ``Comment`` array in the tuple will hold all the comments attached to the ``Rant`` and the `String` in the tuple will be `nil`. If the fetch was unsuccessful, then the `String` in the tuple will hold an error message, and the ``Rant`` and ``Comment`` array in the tuple will both be `nil`.
-    public func getRantFromID(token: UserCredentials?, id: Int, lastCommentID: Int?) async -> (String?, Rant?, [Comment]?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - id: The ID of the rant to fetch.
+    ///    - lastCommentID: If set to a valid comment ID that exists in the rant's comments, the function will get all the comments that were posted after the comment with the given ID.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request.
+    ///
+    ///         If the request was successful, then the result will contain a `Tuple` of a single ``Rant`` with the rant info and a ``Comment`` array with all the comments attached to the rant.
+    ///
+    ///         If the request was a failed, then the result will contain a ``SwiftRantError``.
+    public func getRantFromID(token: UserCredentials?, id: Int, lastCommentID: Int?) async -> Result<(Rant, [Comment]), SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.getRantFromID(token: token, id: id, lastCommentID: lastCommentID) { error, rant, comments in
-                continuation.resume(returning: (error, rant, comments))
+            self.getRantFromID(token: token, id: id, lastCommentID: lastCommentID) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     
     /// Gets a single comment by ID.
     ///
-    /// - parameter id: The ID of the comment to fetch.
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - returns: A tuple that contains an error in a `String` and the comment as a ``Comment``. If the fetch was successful, the `String` in the tuple  will contain `nil` and the ``Comment`` in the tuple will contain the fetched comment. If the fetch was unsuccessful, the `String?` in the tuple will contain an error message, and the ``Comment`` in the tuple will contain `nil`.
-    public func getCommentFromID(_ id: Int, token: UserCredentials?) async -> (String?, Comment?) {
+    /// - Parameters:
+    ///    - id: The ID of the comment to fetch.
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (``Comment`` with the fetched comment if successful, ``SwiftRantError`` if failed).
+    public func getCommentFromID(_ id: Int, token: UserCredentials?) async -> Result<Comment, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.getCommentFromID(id, token: token) { error, comment in
-                continuation.resume(returning: (error, comment))
+            self.getCommentFromID(id, token: token) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     
     /// Gets a personal rant feed based on the user's subscriptions and the activity of the users the user has subscribed to.
     ///
-    /// - parameter token: The user's token. set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter lastEndCursor: The ``SubscribedFeed/PageInfo-swift.struct/endCursor`` you got from the last fetch. Set to `nil` if the SwiftRant instance was configured to use the Keychain and UserDefaults. the SwiftRant instance will get the last end cursor from the last fetch from User Defaults.
-    /// - returns: A tuple that contains an error in a `String` and the Subscribed feed in a ``SubscribedFeed``. If the fetch was successful, the `String` in the tuple will contain `nil`, and the ``SubscribedFeed`` in the tuple will contain the Subscribed feed. If the fetch was unsuccessful, the `String` in the tuple will contain an error message, and the ``SubscribedFeed`` in the tuple will contain `nil`.
-    public func getSubscribedFeed(_ token: UserCredentials?, lastEndCursor: String?) async -> (String?, SubscribedFeed?) {
+    /// - Parameters:
+    ///    - token: The user's token. set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - lastEndCursor: The ``SubscribedFeed/PageInfo-swift.struct/endCursor`` you got from the last fetch. Set to `nil` if the SwiftRant instance was configured to use the Keychain and UserDefaults. the SwiftRant instance will get the last end cursor from the last fetch from User Defaults.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (``SubscribedFeed`` with the fetched Subscribed feed if successful, ``SwiftRantError`` if failed).
+    public func getSubscribedFeed(_ token: UserCredentials?, lastEndCursor: String?) async -> Result<SubscribedFeed, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.getSubscribedFeed(token, lastEndCursor: lastEndCursor) { error, subscribedFeed in
-                continuation.resume(returning: (error, subscribedFeed))
+            self.getSubscribedFeed(token, lastEndCursor: lastEndCursor) { result in
+                continuation.resume(returning: result)
             }
         }
     }
@@ -2663,86 +3088,97 @@ public class SwiftRant {
     /// Retrieves the ID of a user with a specified username
     ///
     /// - parameter username: The username to get the ID for.
-    /// - returns: A tuple that contains an error in a `String` and the user's ID in an `Int`. If the fetch was successful, the `String` in the tuple will contain `nil`, and the `Int?` in the tuple will contain the ID for the given username. If the fetch was unsuccessful, the `String?` in the tuple will contain an error message, and the `Int?` in the tuple will contain `nil`.
-    public func getUserID(of username: String) async -> (String?, Int?) {
+    /// - returns: A `Result<>` which will contain the result of the request (`Int` with the ID of the given username if successful, ``SwiftRantError`` if failed).
+    public func getUserID(of username: String) async -> Result<Int, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.getUserID(of: username) { error, userID in
-                continuation.resume(returning: (error, userID))
+            self.getUserID(of: username) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     
     /// Get a user's profile data.
     ///
-    /// - parameter id: The ID of the user whose data will be fetched.
-    /// - parameter userContentType: The type of content created by the user to be fetched.
-    /// - parameter skip: The amount of content to be skipped on. Useful for pagination/infinite scroll.
-    /// - returns: A tuple that contains an error in a `String` and the profile as a ``Profile``. If the fetch was successful, the `String?` in the tuple will contain `nil`, and the ``Profile`` in the tuple will hold the fetched profile information. If the fetch was unsuccessful, the `String?` in the tuple will contain an error message, and the ``Profile`` in the tuple will contain `nil`.
-    public func getProfileFromID(_ id: Int, token: UserCredentials?, userContentType: Profile.ProfileContentTypes, skip: Int) async -> (String?, Profile?) {
+    /// - Parameters:
+    ///    - id: The ID of the user whose data will be fetched.
+    ///    - token: The user's token. set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - userContentType: The type of content created by the user to be fetched.
+    ///    - skip: The amount of content to be skipped on. Useful for pagination/infinite scroll.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (``Profile`` with the fetched profile information if successful, ``SwiftRantError`` if failed).
+    public func getProfileFromID(_ id: Int, token: UserCredentials?, userContentType: Profile.ProfileContentTypes, skip: Int) async -> Result<Profile, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.getProfileFromID(id, token: token, userContentType: userContentType, skip: skip) { error, profile in
-                continuation.resume(returning: (error, profile))
+            self.getProfileFromID(id, token: token, userContentType: userContentType, skip: skip) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     
     /// Retrieves a set of avatar customization options listed under a specific type of customization.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter type: The type of customization to retrieve the options for.
-    /// - parameter subType: The sub-type of the type of customization to retrieve the options for. Not all customization types have a subtype, so this parameter is optional. If the type does not contain a sub-type, set `subOption` to `nil`.
-    /// - parameter currentImageID: The ID of the current avatar of the user.
-    /// - parameter shouldGetPossibleOptions: Whether or not the server should return the entire list of the different types and sub-types of customizations for a devRant avatar, alongside the query.
-    /// - returns: A tuple that contains an error in a `String` and the query results as a ``AvatarCustomizationResults``. If the request was successful, the `String?` in the tuple will contain `nil`, and the ``AvatarCustomizationResults`` in the tuple will contain the query's results. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the ``AvatarCustomizationResults`` in the tuple will contain `nil`.
-    public func getAvatarCustomizationOptions(_ token: UserCredentials?, type: String, subType: Int?, currentImageID: String, shouldGetPossibleOptions: Bool) async -> (String?, AvatarCustomizationResults?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - type: The type of customization to retrieve the options for.
+    ///    - subType: The sub-type of the type of customization to retrieve the options for. Not all customization types have a subtype, so this parameter is optional. If the type does not contain a sub-type, set `subOption` to `nil`.
+    ///    - currentImageID: The ID of the current avatar of the user.
+    ///    - shouldGetPossibleOptions: Whether or not the server should return the entire list of the different types and sub-types of customizations for a devRant avatar, alongside the query.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (``AvatarCustomizationResults`` with the query's results if successful, ``SwiftRantError`` if failed).
+    public func getAvatarCustomizationOptions(_ token: UserCredentials?, type: String, subType: Int?, currentImageID: String, shouldGetPossibleOptions: Bool) async -> Result<AvatarCustomizationResults, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.getAvatarCustomizationOptions(token, type: type, subType: subType, currentImageID: currentImageID, shouldGetPossibleOptions: shouldGetPossibleOptions) { error, results in
-                continuation.resume(returning: (error, results))
+            self.getAvatarCustomizationOptions(token, type: type, subType: subType, currentImageID: currentImageID, shouldGetPossibleOptions: shouldGetPossibleOptions) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     
     /// Vote on a rant.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter rantID: The ID of the rant to vote on.
-    /// - parameter vote: The vote state. 1 = upvote, 0 = neutral, -1 = downvote.
-    /// - returns: A tuple that contains an error message in a `String` and the updated rant as a ``Rant``. If the request was successful, the `String?` in the tuple will contain `nil`, and the ``Rant`` in the tuple will hold the target rant with updated information. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the ``Rant`` in the tuple will contain `nil`.
-    public func voteOnRant(_ token: UserCredentials?, rantID: Int, vote: Int) async -> (String?, Rant?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - rantID: The ID of the rant to vote on.
+    ///    - vote: The vote state. 1 = upvote, 0 = neutral, -1 = downvote.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (``Rant`` with the updated rant data if successful, ``SwiftRantError`` if failed).
+    public func voteOnRant(_ token: UserCredentials?, rantID: Int, vote: Int) async -> Result<Rant, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.voteOnRant(token, rantID: rantID, vote: vote) { error, updatedRant in
-                continuation.resume(returning: (error, updatedRant))
+            self.voteOnRant(token, rantID: rantID, vote: vote) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     
     /// Vote on a comment.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter commentID: The ID of the comment to vote on.
-    /// - parameter vote: The vote state. 1 = upvote, 0 = neutral, -1 = downvote.
-    /// - returns: A tuple that contains an error message in a `String` and the updated comment as a ``Comment``. If the request was successful, the `String` in the tuple will contain `nil`, and the ``Comment`` in the tuple will hold the target comment with updated information. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the ``Comment`` in the tuple will contain `nil`.
-    public func voteOnComment(_ token: UserCredentials?, commentID id: Int, vote: Int) async -> (String?, Comment?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - commentID: The ID of the comment to vote on.
+    ///    - vote: The vote state. 1 = upvote, 0 = neutral, -1 = downvote.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (``Comment`` with the updated comment data if successful, ``SwiftRantError`` if failed).
+    public func voteOnComment(_ token: UserCredentials?, commentID id: Int, vote: Int) async -> Result<Comment, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.voteOnComment(token, commentID: id, vote: vote) { error, updatedComment in
-                continuation.resume(returning: (error, updatedComment))
+            self.voteOnComment(token, commentID: id, vote: vote) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     
     /// Updates the summary of the user whose token is used.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter aboutSection: The user's about section.
-    /// - parameter skills: The user's list of skills.
-    /// - parameter githubLink: The user's GitHub link.
-    /// - parameter location: The user's location.
-    /// - parameter website: The user's personal website.
-    /// - returns: An error message in a `String`.  If the request was successful, the `String?` will contain `nil`. If the request was unsuccessful, the `String?` will hold an error message.
-    public func editProfileDetails(_ token: UserCredentials?, aboutSection: String?, skills: String?, githubLink: String?, location: String?, website: String?) async -> String? {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - aboutSection: The user's about section.
+    ///    - skills: The user's list of skills.
+    ///    - githubLink: The user's GitHub link.
+    ///    - location: The user's location.
+    ///    - website: The user's personal website.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func editProfileDetails(_ token: UserCredentials?, aboutSection: String?, skills: String?, githubLink: String?, location: String?, website: String?) async -> Result<Void, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.editProfileDetails(token, aboutSection: aboutSection, skills: skills, githubLink: githubLink, location: location, website: website) { error in
-                continuation.resume(returning: error)
+            self.editProfileDetails(token, aboutSection: aboutSection, skills: skills, githubLink: githubLink, location: location, website: website) { result in
+                continuation.resume(returning: result)
             }
         }
     }
@@ -2751,32 +3187,36 @@ public class SwiftRant {
     #if os(iOS) || targetEnvironment(macCatalyst)
     /// Posts a rant to devRant.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter postType: The type of post.
-    /// - parameter content: The text content of the post.
-    /// - parameter tags: The post's associated tags.
-    /// - parameter image: An image to attach to the post.
-    /// - returns: A tuple that contains an error message in a `String` and the ID of the post in an `Int`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Int?` in the tuple will contain the ID of the post. If the the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Int?` in the tuple will contain `nil`.
-    public func postRant(_ token: UserCredentials?, postType: Rant.RantType, content: String, tags: String?, image: UIImage?) async -> (String?, Int?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - postType: The type of post.
+    ///    - content: The text content of the post.
+    ///    - tags: The post's associated tags.
+    ///    - image: An image to attach to the post.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (`Int` with the ID of the rant if successful, ``SwiftRantError`` if failed).
+    public func postRant(_ token: UserCredentials?, postType: Rant.RantType, content: String, tags: String?, image: UIImage?) async -> Result<Int, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.postRant(token, postType: postType, content: content, tags: tags, image: image) { error, rantID in
-                continuation.resume(returning: (error, rantID))
+            self.postRant(token, postType: postType, content: content, tags: tags, image: image) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     #else
     /// Posts a rant to devRant.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter postType: The type of post.
-    /// - parameter content: The text content of the post.
-    /// - parameter tags: The post's associated tags.
-    /// - parameter image: An image to attach to the post.
-    /// - returns: A tuple that contains an error message in a `String` and the ID of the post in an `Int`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Int?` in the tuple will contain the ID of the post. If the the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Int?` in the tuple will contain `nil`.
-    public func postRant(_ token: UserCredentials?, postType: Rant.RantType, content: String, tags: String?, image: NSImage?) async -> (String?, Int?) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - postType: The type of post.
+    ///    - content: The text content of the post.
+    ///    - tags: The post's associated tags.
+    ///    - image: An image to attach to the post.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (`Int` with the ID of the rant if successful, ``SwiftRantError`` if failed).
+    public func postRant(_ token: UserCredentials?, postType: Rant.RantType, content: String, tags: String?, image: NSImage?) async -> Result<Int, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.postRant(token, postType: postType, content: content, tags: tags, image: image) { error, rantID in
-                continuation.resume(returning: (error, rantID))
+            self.postRant(token, postType: postType, content: content, tags: tags, image: image) { result in
+                continuation.resume(returning: result)
             }
         }
     }
@@ -2784,39 +3224,45 @@ public class SwiftRant {
     
     /// Deletes a post from devRant.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter rantID: The ID of the post or rant to be deleted.
-    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If he request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
-    public func deleteRant(_ token: UserCredentials?, rantID: Int) async -> (String?, Bool) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - rantID: The ID of the post or rant to be deleted.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func deleteRant(_ token: UserCredentials?, rantID: Int) async -> Result<Void, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.deleteRant(token, rantID: rantID) { error, success in
-                continuation.resume(returning: (error, success))
+            self.deleteRant(token, rantID: rantID) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     
     /// Marks a rant as a favorite.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter rantID: The ID of the post or rant to be marked as favorite.
-    /// - returns: A tuple that contains an error in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful. the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
-    public func favoriteRant(_ token: UserCredentials?, rantID: Int) async -> (String?, Bool) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - rantID: The ID of the post or rant to be marked as favorite.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func favoriteRant(_ token: UserCredentials?, rantID: Int) async -> Result<Void, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.favoriteRant(token, rantID: rantID) { error, success in
-                continuation.resume(returning: (error, success))
+            self.favoriteRant(token, rantID: rantID) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     
     /// Unmarks a rant as a favorite.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter rantID: The ID of the post or rant to be unmarked as favorite.
-    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful. the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
-    public func unfavoriteRant(_ token: UserCredentials?, rantID: Int) async -> (String?, Bool) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - rantID: The ID of the post or rant to be unmarked as favorite.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func unfavoriteRant(_ token: UserCredentials?, rantID: Int) async -> Result<Void, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.unfavoriteRant(token, rantID: rantID) { error, success in
-                continuation.resume(returning: (error, success))
+            self.unfavoriteRant(token, rantID: rantID) { result in
+                continuation.resume(returning: result)
             }
         }
     }
@@ -2824,34 +3270,38 @@ public class SwiftRant {
     #if os(iOS) || targetEnvironment(macCatalyst)
     /// Edits a posted rant.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter rantID: The ID of the rant to be edited.
-    /// - parameter postType: The new type of the post.
-    /// - parameter content: The new text content of the post.
-    /// - parameter tags: The post's new associated tags.
-    /// - parameter image: A new image to attach to the post.
-    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
-    public func editRant(_ token: UserCredentials?, rantID: Int, postType: Rant.RantType, content: String, tags: String?, image: UIImage?) async -> (String?, Bool) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - rantID: The ID of the rant to be edited.
+    ///    - postType: The new type of the post.
+    ///    - content: The new text content of the post.
+    ///    - tags: The post's new associated tags.
+    ///    - image: A new image to attach to the post.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func editRant(_ token: UserCredentials?, rantID: Int, postType: Rant.RantType, content: String, tags: String?, image: UIImage?) async -> Result<Void, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.editRant(token, rantID: rantID, postType: postType, content: content, tags: tags, image: image) { error, success in
-                continuation.resume(returning: (error, success))
+            self.editRant(token, rantID: rantID, postType: postType, content: content, tags: tags, image: image) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     #else
     /// Edits a posted rant.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter rantID: The ID of the rant to be edited.
-    /// - parameter postType: The new type of the post.
-    /// - parameter content: The new text content of the post.
-    /// - parameter tags: The post's new associated tags.
-    /// - parameter image: A new image to attach to the post.
-    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
-    public func editRant(_ token: UserCredentials?, rantID: Int, postType: Rant.RantType, content: String, tags: String?, image: NSImage?) async -> (String?, Bool) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - rantID: The ID of the rant to be edited.
+    ///    - postType: The new type of the post.
+    ///    - content: The new text content of the post.
+    ///    - tags: The post's new associated tags.
+    ///    - image: A new image to attach to the post.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func editRant(_ token: UserCredentials?, rantID: Int, postType: Rant.RantType, content: String, tags: String?, image: NSImage?) async -> Result<Void, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.editRant(token, rantID: rantID, postType: postType, content: content, tags: tags, image: image) { error, success in
-                continuation.resume(returning: (error, success))
+            self.editRant(token, rantID: rantID, postType: postType, content: content, tags: tags, image: image) { result in
+                continuation.resume(returning: result)
             }
         }
     }
@@ -2860,30 +3310,34 @@ public class SwiftRant {
     #if os(iOS) || targetEnvironment(macCatalyst)
     /// Posts a comment under a specific rant.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter rantID: The ID of the rant to post a comment under.
-    /// - parameter content: The text content of the comment.
-    /// - parameter image: An image to attach to the comment.
-    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
-    public func postComment(_ token: UserCredentials?, rantID: Int, content: String, image: UIImage?) async -> (String?, Bool) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - rantID: The ID of the rant to post a comment under.
+    ///    - content: The text content of the comment.
+    ///    - image: An image to attach to the comment.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func postComment(_ token: UserCredentials?, rantID: Int, content: String, image: UIImage?) async -> Result<Void, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.postComment(token, rantID: rantID, content: content, image: image) { error, success in
-                continuation.resume(returning: (error, success))
+            self.postComment(token, rantID: rantID, content: content, image: image) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     #else
     /// Posts a comment under a specific rant.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter rantID: The ID of the rant to post a comment under.
-    /// - parameter content: The text content of the comment.
-    /// - parameter image: An image to attach to the comment.
-    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
-    public func postComment(_ token: UserCredentials?, rantID: Int, content: String, image: NSImage?) async -> (String?, Bool) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - rantID: The ID of the rant to post a comment under.
+    ///    - content: The text content of the comment.
+    ///    - image: An image to attach to the comment.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func postComment(_ token: UserCredentials?, rantID: Int, content: String, image: NSImage?) async -> Result<Void, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.postComment(token, rantID: rantID, content: content, image: image) { error, success in
-                continuation.resume(returning: (error, success))
+            self.postComment(token, rantID: rantID, content: content, image: image) { result in
+                continuation.resume(returning: result)
             }
         }
     }
@@ -2892,30 +3346,34 @@ public class SwiftRant {
     #if os(iOS) || targetEnvironment(macCatalyst)
     /// Edits a posted comment.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter commentID: The ID of the comment to be edited.
-    /// - parameter content: The new text content of the comment.
-    /// - parameter image: A new image to attach to the comment.
-    /// - parameter completionHandler: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
-    public func editComment(_ token: UserCredentials?, commentID: Int, content: String, image: UIImage?) async -> (String?, Bool) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - commentID: The ID of the comment to be edited.
+    ///    - content: The new text content of the comment.
+    ///    - image: A new image to attach to the comment.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func editComment(_ token: UserCredentials?, commentID: Int, content: String, image: UIImage?) async -> Result<Void, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.editComment(token, commentID: commentID, content: content, image: image) { error, success in
-                continuation.resume(returning: (error, success))
+            self.editComment(token, commentID: commentID, content: content, image: image) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     #else
     /// Edits a posted comment.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter commentID: The ID of the comment to be edited.
-    /// - parameter content: The new text content of the comment.
-    /// - parameter image: A new image to attach to the comment.
-    /// - parameter completionHandler: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
-    public func editComment(_ token: UserCredentials?, commentID: Int, content: String, image: NSImage?) async -> (String?, Bool) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - commentID: The ID of the comment to be edited.
+    ///    - content: The new text content of the comment.
+    ///    - image: A new image to attach to the comment.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func editComment(_ token: UserCredentials?, commentID: Int, content: String, image: NSImage?) async -> Result<Void, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.editComment(token, commentID: commentID, content: content, image: image) { error, success in
-                continuation.resume(returning: (error, success))
+            self.editComment(token, commentID: commentID, content: content, image: image) { result in
+                continuation.resume(returning: result)
             }
         }
     }
@@ -2923,26 +3381,30 @@ public class SwiftRant {
     
     /// Deletes an existing comment.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter commentID: The ID of the comment to be deleted.
-    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
-    public func deleteComment(_ token: UserCredentials?, commentID: Int) async -> (String?, Bool) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - commentID: The ID of the comment to be deleted.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func deleteComment(_ token: UserCredentials?, commentID: Int) async -> Result<Void, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.deleteComment(token, commentID: commentID) { error, success in
-                continuation.resume(returning: (error, success))
+            self.deleteComment(token, commentID: commentID) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     
     /// Updates the avatar image for the given user.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter fullImageID: The ID of the new avatar image (a file name with the extension of .png).
-    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool` If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
-    public func confirmAvatarCustomization(_ token: UserCredentials?, fullImageID: String) async -> (String?, Bool) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - fullImageID: The ID of the new avatar image (a file name with the extension of .png).
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func confirmAvatarCustomization(_ token: UserCredentials?, fullImageID: String) async -> Result<Void, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.confirmAvatarCustomization(token, fullImageID: fullImageID) { error, success in
-                continuation.resume(returning: (error, success))
+            self.confirmAvatarCustomization(token, fullImageID: fullImageID) { result in
+                continuation.resume(returning: result)
             }
         }
     }
@@ -2950,37 +3412,42 @@ public class SwiftRant {
     /// Marks all unread notifications as read.
     ///
     /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
-    public func clearNotifications(_ token: UserCredentials?) async -> (String?, Bool) {
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func clearNotifications(_ token: UserCredentials?) async -> Result<Void, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.clearNotifications(token) { error, success in
-                continuation.resume(returning: (error, success))
+            self.clearNotifications(token) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     
     /// Subscribes to a user with the specified ID.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter userID: The ID of the user to subscribe to.
-    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
-    public func subscribeToUser(_ token: UserCredentials?, userID: Int) async -> (String?, Bool) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - userID: The ID of the user to subscribe to.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func subscribeToUser(_ token: UserCredentials?, userID: Int) async -> Result<Void, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.subscribeToUser(token, userID: userID) { error, success in
-                continuation.resume(returning: (error, success))
+            self.subscribeToUser(token, userID: userID) { result in
+                continuation.resume(returning: result)
             }
         }
     }
     
     /// Unsubscribes to a user with the specified ID.
     ///
-    /// - parameter token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
-    /// - parameter userID: The ID of the user to unsubscribe from.
-    /// - returns: A tuple that contains an error message in a `String` and whether or not the request succeeded in a `Bool`. If the request was successful, the `String?` in the tuple will contain `nil`, and the `Bool` in the tuple will contain `true`. If the request was unsuccessful, the `String?` in the tuple will contain an error message, and the `Bool` in the tuple will contain `false`.
-    public func unsubscribeFromUser(_ token: UserCredentials?, userID: Int) async -> (String?, Bool) {
+    /// - Parameters:
+    ///    - token: The user's token. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - userID: The ID of the user to unsubscribe from.
+    ///
+    /// - returns: A `Result<>` which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
+    public func unsubscribeFromUser(_ token: UserCredentials?, userID: Int) async -> Result<Void, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.subscribeToUser(token, userID: userID) { error, success in
-                continuation.resume(returning: (error, success))
+            self.subscribeToUser(token, userID: userID) { result in
+                continuation.resume(returning: result)
             }
         }
     }
