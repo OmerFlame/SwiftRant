@@ -63,13 +63,12 @@ final class SwiftRantTests: XCTestCase {
         print("Print your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, token in
-            XCTAssertNotNil(token)
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
             let storedToken: UserCredentials? = keychainWrapper.decode(forKey: "DRToken")
             
-            XCTAssertEqual(storedToken, token)
+            XCTAssertEqual(storedToken, try? result.get())
             
             XCTAssertNotNil(storedToken)
             
@@ -115,14 +114,13 @@ final class SwiftRantTests: XCTestCase {
         print("Print your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!, completionHandler: { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!, completionHandler: { result in
+            XCTAssertNotNil(try? result.get())
             
-            SwiftRant.shared.getRantFeed(token: nil, skip: 0, prevSet: nil, completionHandler: { error, rantFeed in
+            SwiftRant.shared.getRantFeed(token: nil, skip: 0, prevSet: nil, completionHandler: { result in
                 //print("BREAKPOINT HERE")
                 
-                XCTAssertNotNil(rantFeed)
-                XCTAssertNil(error)
+                XCTAssertNotNil(try? result.get())
                 
                 semaphore.signal()
             })
@@ -153,12 +151,11 @@ final class SwiftRantTests: XCTestCase {
         print("Print your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
-            SwiftRant.shared.getWeekList(token: nil) { error, list in
-                XCTAssertNotNil(list)
-                XCTAssertNil(error)
+            SwiftRant.shared.getWeekList(token: nil) { result in
+                XCTAssertNotNil(try? result.get())
                 
                 semaphore.signal()
             }
@@ -180,12 +177,11 @@ final class SwiftRantTests: XCTestCase {
         print("Print your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
-            SwiftRant.shared.getWeeklyRants(token: nil, skip: 0, week: 329) { error, feed in
-                XCTAssertNil(error)
-                XCTAssertNotNil(feed)
+            SwiftRant.shared.getWeeklyRants(token: nil, skip: 0, week: 329) { result in
+                XCTAssertNotNil(try? result.get())
                 
                 semaphore.signal()
             }
@@ -207,13 +203,11 @@ final class SwiftRantTests: XCTestCase {
         print("Print your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
-            SwiftRant.shared.getRantFromID(token: nil, id: 5055500, lastCommentID: nil) { error, rant, comments in
-                XCTAssertNil(error)
-                XCTAssertNotNil(rant)
-                XCTAssertNotNil(comments)
+            SwiftRant.shared.getRantFromID(token: nil, id: 5055500, lastCommentID: nil) { result in
+                XCTAssertNotNil(try? result.get())
                 
                 print("BREAKPOINT")
                 
@@ -246,8 +240,8 @@ final class SwiftRantTests: XCTestCase {
         print("Print your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
             /*SwiftRant.shared.getRantFromID(token: nil, id: 4806571, lastCommentID: 4806576) { error, rant, comments in
                 XCTAssertNil(error)
@@ -259,9 +253,8 @@ final class SwiftRantTests: XCTestCase {
                 semaphore.signal()
             }*/
             
-            SwiftRant.shared.getNotificationFeed(token: nil, lastCheckTime: nil, shouldGetNewNotifs: false, category: .all) { error, notifications in
-                XCTAssertNil(error)
-                XCTAssertNotNil(notifications)
+            SwiftRant.shared.getNotificationFeed(token: nil, lastCheckTime: nil, shouldGetNewNotifs: false, category: .all) { result in
+                XCTAssertNotNil(try? result.get())
                 
                 print("BREAKPOINT")
                 
@@ -294,12 +287,11 @@ final class SwiftRantTests: XCTestCase {
         print("Print your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
-            SwiftRant.shared.getCommentFromID(4813564, token: nil) { error, comment in
-                XCTAssertNil(error)
-                XCTAssertNotNil(comment)
+            SwiftRant.shared.getCommentFromID(4813564, token: nil) { result in
+                XCTAssertNotNil(try? result.get())
                 
                 print("BREAKPOINT HERE")
                 semaphore.signal()
@@ -331,12 +323,11 @@ final class SwiftRantTests: XCTestCase {
         print("Print your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
-            SwiftRant.shared.voteOnRant(nil, rantID: 4811624, vote: 0) { error, updatedRant in
-                XCTAssertNil(error)
-                XCTAssertNotNil(updatedRant)
+            SwiftRant.shared.voteOnRant(nil, rantID: 4811624, vote: 0) { result in
+                XCTAssertNotNil(try? result.get())
                 
                 print("BREAKPOINT HERE")
                 
@@ -369,12 +360,11 @@ final class SwiftRantTests: XCTestCase {
         print("Print your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
-            SwiftRant.shared.voteOnComment(nil, commentID: 4811651, vote: 0) { error, updatedComment in
-                XCTAssertNil(error)
-                XCTAssertNotNil(updatedComment)
+            SwiftRant.shared.voteOnComment(nil, commentID: 4811651, vote: 0) { result in
+                XCTAssertNotNil(try? result.get())
                 
                 print("BREAKPOINT HERE")
                 
@@ -407,12 +397,11 @@ final class SwiftRantTests: XCTestCase {
         print("Print your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
-            SwiftRant.shared.getProfileFromID(SwiftRant.shared.tokenFromKeychain!.authToken.userID, token: nil, userContentType: .all, skip: 0) { error, profile in
-                XCTAssertNil(error)
-                XCTAssertNotNil(profile)
+            SwiftRant.shared.getProfileFromID(SwiftRant.shared.tokenFromKeychain!.authToken.userID, token: nil, userContentType: .all, skip: 0) { result in
+                XCTAssertNotNil(try? result.get())
                 
                 print("BREAKPOINT HERE")
                 
@@ -445,11 +434,11 @@ final class SwiftRantTests: XCTestCase {
         print("Print your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
-            SwiftRant.shared.editProfileDetails(nil, aboutSection: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris sagittis, nulla accumsan viverra malesuada, sem ex consectetur ex, vitae iaculis felis lorem quis turpis. Duis imperdiet diam sed enim gravida ultrices. Mauris tempus rhoncus nunc, ac interdum tortor dictum nec. Praesent pretium id enim sit amet aliquet. Sed cursus laoreet porttitor.", skills: "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", githubLink: "Lorem impsum", location: "Lorem ipsum, dolor", website: nil) { error in
-                XCTAssertNil(error)
+            SwiftRant.shared.editProfileDetails(nil, aboutSection: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris sagittis, nulla accumsan viverra malesuada, sem ex consectetur ex, vitae iaculis felis lorem quis turpis. Duis imperdiet diam sed enim gravida ultrices. Mauris tempus rhoncus nunc, ac interdum tortor dictum nec. Praesent pretium id enim sit amet aliquet. Sed cursus laoreet porttitor.", skills: "Lorem ipsum dolor sit amet, consectetur adipiscing elit.", githubLink: "Lorem impsum", location: "Lorem ipsum, dolor", website: nil) { result in
+                XCTAssertNotNil(try? result.get())
                 
                 semaphore.signal()
             }
@@ -481,12 +470,11 @@ final class SwiftRantTests: XCTestCase {
         print("Print your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
-            SwiftRant.shared.postRant(nil, postType: .undefined, content: "This is a test post", tags: nil, image: nil) { error, rantID in
-                XCTAssertNil(error)
-                XCTAssertNotNil(rantID)
+            SwiftRant.shared.postRant(nil, postType: .undefined, content: "This is a test post", tags: nil, image: nil) { result in
+                XCTAssertNotNil(try? result.get())
                 
                 semaphore.signal()
             }
@@ -518,8 +506,8 @@ final class SwiftRantTests: XCTestCase {
         print("Enter your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
             print("Please enter the ID of the rant that you want to delete: ", terminator: "")
             var rantID = Int(readLine() ?? "")
@@ -530,12 +518,11 @@ final class SwiftRantTests: XCTestCase {
                 rantID = Int(readLine() ?? "")
             }
             
-            SwiftRant.shared.deleteRant(nil, rantID: rantID!) { error, success in
-                if !success {
-                    if let error = error {
-                        XCTExpectFailure("""
+            SwiftRant.shared.deleteRant(nil, rantID: rantID!) { result in
+                if case .failure(let failure) = result {
+                    XCTExpectFailure("""
 Something failed, but it might be completely expected.
-This is the error that the function returned: \(error)
+This is the error that the function returned: \(failure.message)
 
 Before panicking, please make sure that:
 
@@ -543,8 +530,7 @@ Before panicking, please make sure that:
 2. The supplied user owns the post.
 3. None of the user's login credentials (username and/or password) have been changed externally while sending the request.
 """) {
-                            XCTFail()
-                        }
+                        XCTFail()
                     }
                 }
                 
@@ -578,8 +564,8 @@ Before panicking, please make sure that:
         print("Enter your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
             print("Please enter the ID of the rant that you want to favorite: ", terminator: "")
             var rantID = Int(readLine() ?? "")
@@ -590,20 +576,18 @@ Before panicking, please make sure that:
                 rantID = Int(readLine() ?? "")
             }
             
-            SwiftRant.shared.favoriteRant(nil, rantID: rantID!) { error, success in
-                if !success {
-                    if let error = error {
-                        XCTExpectFailure("""
+            SwiftRant.shared.favoriteRant(nil, rantID: rantID!) { result in
+                if case .failure(let failure) = result {
+                    XCTExpectFailure("""
 Something failed, but it might be completely expected.
-This is the error that the function returned: \(error)
+This is the error that the function returned: \(failure.message)
 
 Before panicking, please make sure that:
 
 1. The post exists on devRant.
 2. None of the user's login credentials (username and/or password) have been changed externally while sending the request.
 """) {
-                            XCTFail()
-                        }
+                        XCTFail()
                     }
                 }
                 
@@ -637,8 +621,8 @@ Before panicking, please make sure that:
         print("Enter your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
             print("Please enter the ID of the rant that you want to unfavorite: ", terminator: "")
             var rantID = Int(readLine() ?? "")
@@ -649,20 +633,18 @@ Before panicking, please make sure that:
                 rantID = Int(readLine() ?? "")
             }
             
-            SwiftRant.shared.unfavoriteRant(nil, rantID: rantID!) { error, success in
-                if !success {
-                    if let error = error {
-                        XCTExpectFailure("""
+            SwiftRant.shared.unfavoriteRant(nil, rantID: rantID!) { result in
+                if case .failure(let failure) = result {
+                    XCTExpectFailure("""
 Something failed, but it might be completely expected.
-This is the error that the function returned: \(error)
+This is the error that the function returned: \(failure.message)
 
 Before panicking, please make sure that:
 
 1. The post exists on devRant.
 2. None of the user's login credentials (username and/or password) have been changed externally while sending the request.
 """) {
-                            XCTFail()
-                        }
+                        XCTFail()
                     }
                 }
                 
@@ -696,8 +678,8 @@ Before panicking, please make sure that:
         print("Enter your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
             print("Please enter the ID of the rant that you want to edit: ", terminator: "")
             var rantID = Int(readLine() ?? "")
@@ -746,12 +728,11 @@ Before panicking, please make sure that:
             
             print("NOTE: Adding images in tests are not supported.")
             
-            SwiftRant.shared.editRant(nil, rantID: rantID!, postType: postType, content: content, tags: tags, image: nil) { error, success in
-                if !success {
-                    if let error = error {
-                        XCTExpectFailure("""
+            SwiftRant.shared.editRant(nil, rantID: rantID!, postType: postType, content: content, tags: tags, image: nil) { result in
+                if case .failure(let failure) = result {
+                    XCTExpectFailure("""
 Something failed, but it might be completely expected.
-This is the error that the function returned: \(error)
+This is the error that the function returned: \(failure.message)
 
 Before panicking, please make sure that:
 
@@ -759,8 +740,7 @@ Before panicking, please make sure that:
 2. The user that you provided owns the rant.
 3. None of the user's login credentials (username and/or password) have been changed externally while sending the request.
 """) {
-                            XCTFail()
-                        }
+                        XCTFail()
                     }
                 }
                 
@@ -794,8 +774,8 @@ Before panicking, please make sure that:
         print("Enter your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
             print("Please enter the ID of the rant to post a comment under: ", terminator: "")
             var rantID = Int(readLine() ?? "")
@@ -818,20 +798,18 @@ Before panicking, please make sure that:
             
             print("NOTE: Images in tests are not supported.")
             
-            SwiftRant.shared.postComment(nil, rantID: rantID!, content: content, image: nil) { error, success in
-                if !success {
-                    if let error = error {
-                        XCTExpectFailure("""
+            SwiftRant.shared.postComment(nil, rantID: rantID!, content: content, image: nil) { result in
+                if case .failure(let failure) = result {
+                    XCTExpectFailure("""
 Something failed, but it might be completely expected.
-This is the error that the function returned: \(error)
+This is the error that the function returned: \(failure.message)
 
 Before panicking, please make sure that:
 
 1. The post exists on devRant.
 2. None of the user's login credentials (username and/or password) have been changed externally while sending the request.
 """) {
-                            XCTFail()
-                        }
+                        XCTFail()
                     }
                 }
                 
@@ -865,8 +843,8 @@ Before panicking, please make sure that:
         print("Enter your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
             print("Please enter the ID of the comment that you want to edit: ", terminator: "")
             var commentID = Int(readLine() ?? "")
@@ -889,12 +867,11 @@ Before panicking, please make sure that:
             
             print("NOTE: Adding images is not supported in tests.")
             
-            SwiftRant.shared.editComment(nil, commentID: commentID!, content: content, image: nil) { error, success in
-                if !success {
-                    if let error = error {
-                        XCTExpectFailure("""
+            SwiftRant.shared.editComment(nil, commentID: commentID!, content: content, image: nil) { result in
+                if case .failure(let failure) = result {
+                    XCTExpectFailure("""
 Something failed, but it might be completely expected.
-This is the error that the function returned: \(error)
+This is the error that the function returned: \(failure.message)
 
 Before panicking, please make sure that:
 
@@ -902,8 +879,7 @@ Before panicking, please make sure that:
 2. The provided user owns the comment.
 3. None of the user's login credentials (username and/or password) have been changed externally while sending the request.
 """) {
-                            XCTFail()
-                        }
+                        XCTFail()
                     }
                 }
                 
@@ -937,8 +913,8 @@ Before panicking, please make sure that:
         print("Enter your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
             print("Please enter the ID of the comment that you want to delete: ", terminator: "")
             var commentID = Int(readLine() ?? "")
@@ -949,12 +925,11 @@ Before panicking, please make sure that:
                 commentID = Int(readLine() ?? "")
             }
             
-            SwiftRant.shared.deleteComment(nil, commentID: commentID!) { error, success in
-                if !success {
-                    if let error = error {
-                        XCTExpectFailure("""
+            SwiftRant.shared.deleteComment(nil, commentID: commentID!) { result in
+                if case .failure(let failure) = result {
+                    XCTExpectFailure("""
 Something failed, but it might be completely expected.
-This is the error that the function returned: \(error)
+This is the error that the function returned: \(failure.message)
 
 Before panicking, please make sure that:
 
@@ -962,8 +937,7 @@ Before panicking, please make sure that:
 2. The provided user owns the comment.
 3. None of the user's login credentials (username and/or password) have been changed externally while sending the request.
 """) {
-                            XCTFail()
-                        }
+                        XCTFail()
                     }
                 }
                 
@@ -996,8 +970,8 @@ Before panicking, please make sure that:
         print("Enter your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
             print("Please enter the type of customization that you want to get options for: ", terminator: "")
             var type = readLine()
@@ -1020,8 +994,8 @@ Before panicking, please make sure that:
             print("Please enter the current ID of the image of the user: ", terminator: "")
             let currentImageID = readLine()!
             
-            SwiftRant.shared.getAvatarCustomizationOptions(nil, type: type!, subType: subType, currentImageID: currentImageID, shouldGetPossibleOptions: true) { error, results in
-                XCTAssertNil(error)
+            SwiftRant.shared.getAvatarCustomizationOptions(nil, type: type!, subType: subType, currentImageID: currentImageID, shouldGetPossibleOptions: true) { result in
+                XCTAssertNotNil(try? result.get())
                 
                 //raise(SIGTRAP)
                 
@@ -1056,8 +1030,8 @@ Before panicking, please make sure that:
         print("Enter your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
             print("Please enter the ID of the new full avatar image: ", terminator: "")
             var fullImageID = readLine()
@@ -1068,20 +1042,18 @@ Before panicking, please make sure that:
                 fullImageID = readLine()
             }
             
-            SwiftRant.shared.confirmAvatarCustomization(nil, fullImageID: fullImageID!) { error, success in
-                if !success {
-                    if let error = error {
-                        XCTExpectFailure("""
+            SwiftRant.shared.confirmAvatarCustomization(nil, fullImageID: fullImageID!) { result in
+                if case .failure(let failure) = result {
+                    XCTExpectFailure("""
 Something failed, but it might be completely expected.
-This is the error that the function returned: \(error)
+This is the error that the function returned: \(failure.message)
 
 Before panicking, please make sure that:
 
 1. The user in question has enough ++'s in order to equip the new customizations.
 2. None of the user's login credentials (username and/or password) have been changed externally while sending the request.
 """) {
-                            XCTFail()
-                        }
+                        XCTFail()
                     }
                 }
                 
@@ -1115,18 +1087,18 @@ Before panicking, please make sure that:
             username = readLine() ?? ""
         }
         
-        SwiftRant.shared.getUserID(of: username) { error, userID in
-            if let error = error {
+        SwiftRant.shared.getUserID(of: username) { result in
+            if case .failure(let failure) = result {
                 XCTExpectFailure("""
 Something failed, but it might be completely expected.
-This is the error that the function returned: \(error)
+This is the error that the function returned: \(failure.message)
 
 Before panicking, please make sure that there is a user that exists with the *exact* same username on devRant.
 """) {
                     XCTFail()
                 }
-            } else {
-                print("GOT USER ID \(userID!) FOR USERNAME \(username)")
+            } else if case .success(let userID) = result {
+                print("GOT USER ID \(userID) FOR USERNAME \(username)")
             }
             
             semaphore.signal()
@@ -1146,23 +1118,21 @@ Before panicking, please make sure that there is a user that exists with the *ex
         print("Enter your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
-            SwiftRant.shared.clearNotifications(nil) { error, success in
-                if !success {
-                    if let error = error {
-                        XCTExpectFailure("""
+            SwiftRant.shared.clearNotifications(nil) { result in
+                if case .failure(let failure) = result {
+                    XCTExpectFailure("""
 Something failed, but it might be completely expected.
-This is the error that the function returned: \(error)
+This is the error that the function returned: \(failure.message)
 
 Before panicking, please make sure that:
 
 1. The user exists on devRant.
 2. None of the user's login credentials (username and/or password) have been changed externally while sending the request.
 """) {
-                            XCTFail()
-                        }
+                        XCTFail()
                     }
                 }
                 
@@ -1195,11 +1165,11 @@ Before panicking, please make sure that:
         print("Enter your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { error, _ in
-            XCTAssertNil(error)
+        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+            XCTAssertNotNil(try? result.get())
             
-            SwiftRant.shared.getSubscribedFeed(nil, lastEndCursor: nil) { error, feed in
-                XCTAssertNil(error)
+            SwiftRant.shared.getSubscribedFeed(nil, lastEndCursor: nil) { result in
+                XCTAssertNotNil(try? result.get())
                 
                 print("BREAKPOINT")
                 
