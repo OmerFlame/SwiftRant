@@ -550,9 +550,12 @@ public class SwiftRant {
                             }
                         }
                     } else {
-                        completionHandler(.success(weekList!))
+                        completionHandler(.failure(SwiftRantError(message: "An unknown error has occurred.")))
                         return
                     }
+                } else {
+                    completionHandler(.success(weekList!))
+                    return
                 }
             }
             
