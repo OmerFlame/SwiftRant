@@ -19,8 +19,8 @@ struct NotificationFeed: Decodable {
 public struct Notifications: Decodable {
     
     /// An enumeration representing all different categories of notifications.
-    public enum Categories: String {
-        case all
+    public enum Categories: Int {
+        case all = 0
         case upvotes
         case mentions
         case comments
