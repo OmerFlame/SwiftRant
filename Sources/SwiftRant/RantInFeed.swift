@@ -32,20 +32,9 @@ public struct RantInFeed: Decodable, Identifiable {
     /// The tags this rant is listed under.
     public let tags: [String]
     
-    /// The current logged-in user's vote on the rant.
-    /// * `1` = Upvote
-    /// * `0` = Unvoted
-    /// * `-1` = Downvote
-    /// * `-2` = Voting disabled (the rant belongs to the user whose token was used to fetch the rant)
     public var voteStateRaw: Int
     
-    public enum VoteState: Int {
-        case upvoted = 1
-        case unvoted = 0
-        case downvoted = -1
-        case unvotable = -2
-    }
-    
+    /// The current logged-in user's vote on the rant.
     public var voteState: VoteState {
         get {
             return VoteState(rawValue: voteStateRaw) ?? .unvotable
