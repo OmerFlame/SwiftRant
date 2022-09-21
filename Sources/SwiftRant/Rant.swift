@@ -177,15 +177,17 @@ public struct Rant: Decodable, Identifiable {
     /// The tags the rant is listed under.
     public let tags: [String]
     
-    /**
-     The current logged-in user's vote on the rant.
-     
-     * `1` = upvote
-     * `0` = unvoted
-     * `-1` = downvote
-     * `-2` = voting disabled (the rant belongs to the user whose token was used to fetch the rant)
-     */
-    public var voteState: Int
+    public var voteStateRaw: Int
+    
+    /// The current logged-in user's vote on the rant.
+    public var voteState: VoteState {
+        get {
+            return VoteState(rawValue: voteStateRaw) ?? .unvotable
+        }
+        set {
+            voteStateRaw = newValue.rawValue
+        }
+    }
     
     /// Whether or not the rant's author has edited the rant in the past.
     public let isEdited: Bool
@@ -283,7 +285,7 @@ public struct Rant: Decodable, Identifiable {
         case undefined = 7
     }
     
-    public init(weekly: Rant.Weekly?, id: Int, text: String, score: Int, createdTime: Int, attachedImage: Rant.AttachedImage?, commentCount: Int, tags: [String], voteState: Int, isEdited: Bool, isFavorite: Int? = nil, link: String?, links: [Rant.Link]? = nil, collabTypeLong: String?, collabDescription: String?, collabTechStack: String?, collabTeamSize: String?, collabURL: String?, userID: Int, username: String, userScore: Int, userAvatar: Rant.UserAvatar, userAvatarLarge: Rant.UserAvatar, isUserDPP: Int?) {
+    public init(weekly: Rant.Weekly?, id: Int, text: String, score: Int, createdTime: Int, attachedImage: Rant.AttachedImage?, commentCount: Int, tags: [String], voteState: VoteState, isEdited: Bool, isFavorite: Int? = nil, link: String?, links: [Rant.Link]? = nil, collabTypeLong: String?, collabDescription: String?, collabTechStack: String?, collabTeamSize: String?, collabURL: String?, userID: Int, username: String, userScore: Int, userAvatar: Rant.UserAvatar, userAvatarLarge: Rant.UserAvatar, isUserDPP: Int?) {
         self.weekly = weekly
         self.id = id
         self.text = text
@@ -292,7 +294,7 @@ public struct Rant: Decodable, Identifiable {
         self.attachedImage = attachedImage
         self.commentCount = commentCount
         self.tags = tags
-        self.voteState = voteState
+        self.voteStateRaw = voteState.rawValue
         self.isEdited = isEdited
         self.isFavorite = isFavorite
         self.link = link
@@ -326,7 +328,7 @@ public struct Rant: Decodable, Identifiable {
         
         commentCount = try values.decode(Int.self, forKey: .commentCount)
         tags = try values.decode([String].self, forKey: .tags)
-        voteState = try values.decode(Int.self, forKey: .voteState)
+        voteStateRaw = try values.decode(Int.self, forKey: .voteState)
         weekly = try? values.decode(Weekly.self, forKey: .weekly)
         isEdited = try values.decode(Bool.self, forKey: .isEdited)
         isFavorite = try? values.decode(Int.self, forKey: .isFavorite)
