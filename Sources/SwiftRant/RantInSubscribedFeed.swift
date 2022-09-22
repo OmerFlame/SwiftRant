@@ -161,12 +161,17 @@ public struct RantInSubscribedFeed: Decodable {
     /// The tags this rant is listed under.
     public let tags: [String]
     
+    public var voteStateRaw: Int
+    
     /// The current logged-in user's vote on the rant.
-    /// * `1` = Upvote
-    /// * `0` = Unvoted
-    /// * `-1` = Downvote
-    /// * `-2` = Voting disabled (the rant belongs to the user whose token was used to fetch the rant)
-    public var voteState: Int
+    public var voteState: VoteState {
+        get {
+            return VoteState(rawValue: voteStateRaw) ?? .unvotable
+        }
+        set {
+            voteStateRaw = newValue.rawValue
+        }
+    }
     
     /// Whether or not the rant was edited in the past.
     public let isEdited: Bool
@@ -179,7 +184,7 @@ public struct RantInSubscribedFeed: Decodable {
         case actions
     }
     
-    public init(id: Int, text: String, score: Int, createdTime: Int, attachedImage: Rant.AttachedImage?, commentCount: Int, tags: [String], voteState: Int, isEdited: Bool, relatedUserActions: [RantInSubscribedFeed.RelatedUserAction]) {
+    public init(id: Int, text: String, score: Int, createdTime: Int, attachedImage: Rant.AttachedImage?, commentCount: Int, tags: [String], voteState: VoteState, isEdited: Bool, relatedUserActions: [RantInSubscribedFeed.RelatedUserAction]) {
         self.id = id
         self.text = text
         self.score = score
@@ -187,7 +192,7 @@ public struct RantInSubscribedFeed: Decodable {
         self.attachedImage = attachedImage
         self.commentCount = commentCount
         self.tags = tags
-        self.voteState = voteState
+        self.voteStateRaw = voteState.rawValue
         self.isEdited = isEdited
         self.relatedUserActions = relatedUserActions
     }
@@ -214,7 +219,7 @@ public struct RantInSubscribedFeed: Decodable {
         
         tags = rantInFeedProperties["tags"]! as! [String]
         
-        voteState = rantInFeedProperties["vote_state"]! as! Int
+        voteStateRaw = rantInFeedProperties["vote_state"]! as! Int
         
         isEdited = rantInFeedProperties["edited"]! as! Bool
         

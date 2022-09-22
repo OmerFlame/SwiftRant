@@ -26,12 +26,17 @@ public struct Comment: Decodable, Identifiable {
     /// The Unix timestamp at which the comment was posted.
     public let createdTime: Int
     
+    public var voteStateRaw: Int
+    
     /// The current logged-in user's vote on the comment.
-    /// * 1 = upvote
-    /// * 0 = unvoted
-    /// * -1 = downvote
-    /// * -2 = voting disabled (the comment belongs to the user whose token was used to fetch the comment)
-    public var voteState: Int
+    public var voteState: VoteState {
+        get {
+            return VoteState(rawValue: voteStateRaw) ?? .unvotable
+        }
+        set {
+            voteStateRaw = newValue.rawValue
+        }
+    }
     
     /// If the comment includes URLs in the text, those that were successfully parsed by the server will be in this array.
     public var links: [Rant.Link]?
@@ -60,7 +65,7 @@ public struct Comment: Decodable, Identifiable {
              body,
              score,
              createdTime = "created_time",
-             voteState = "vote_state",
+             voteStateRaw = "vote_state",
              links,
              userID = "user_id",
              username = "user_username",
@@ -70,14 +75,14 @@ public struct Comment: Decodable, Identifiable {
              attachedImage = "attached_image"
     }
     
-    public init(uuid: UUID = UUID(), id: Int, rantID: Int, body: String, score: Int, createdTime: Int, voteState: Int, links: [Rant.Link]?, userID: Int, username: String, userScore: Int, userAvatar: Rant.UserAvatar, isUserDPP: Int?, attachedImage: Rant.AttachedImage?) {
+    public init(uuid: UUID = UUID(), id: Int, rantID: Int, body: String, score: Int, createdTime: Int, voteState: VoteState, links: [Rant.Link]?, userID: Int, username: String, userScore: Int, userAvatar: Rant.UserAvatar, isUserDPP: Int?, attachedImage: Rant.AttachedImage?) {
         self.uuid = uuid
         self.id = id
         self.rantID = rantID
         self.body = body
         self.score = score
         self.createdTime = createdTime
-        self.voteState = voteState
+        self.voteStateRaw = voteState.rawValue
         self.links = links
         self.userID = userID
         self.username = username
@@ -94,7 +99,7 @@ public struct Comment: Decodable, Identifiable {
         body = try values.decode(String.self, forKey: .body)
         score = try values.decode(Int.self, forKey: .score)
         createdTime = try values.decode(Int.self, forKey: .createdTime)
-        voteState = try values.decode(Int.self, forKey: .voteState)
+        voteStateRaw = try values.decode(Int.self, forKey: .voteStateRaw)
         links = try? values.decodeIfPresent([Rant.Link].self, forKey: .links)
         userID = try values.decode(Int.self, forKey: .userID)
         username = try values.decode(String.self, forKey: .username)
