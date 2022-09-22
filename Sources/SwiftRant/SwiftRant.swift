@@ -1174,7 +1174,7 @@ public class SwiftRant {
     ///    - completionHandler: The completion handler to call when the request is complete.
     ///
     ///         The completion handler takes in a single `result` parameter which will contain the result of the request (``Rant`` with the updated rant data if successful, ``SwiftRantError`` if failed).
-    public func voteOnRant(_ token: UserCredentials?, rantID id: Int, vote: Int, completionHandler: ((Result<Rant, SwiftRantError>) -> Void)?) {
+    public func voteOnRant(_ token: UserCredentials?, rantID id: Int, vote: VoteState, completionHandler: ((Result<Rant, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
                 //fatalError("No token was specified!")
@@ -1224,7 +1224,7 @@ public class SwiftRant {
         
         request.httpMethod = "POST"
         request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        request.httpBody = "app=3&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)&vote=\(vote)".data(using: .utf8)
+        request.httpBody = "app=3&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)&vote=\(vote.rawValue)".data(using: .utf8)
         
         let session = URLSession(configuration: .default)
         
@@ -1268,7 +1268,7 @@ public class SwiftRant {
     ///    - completionHandler: The completion handler to call when the request is complete.
     ///
     ///         The completion handler takes in a single `result` parameter which will contain the result of the request (``Comment`` with the updated comment data if successful, ``SwiftRantError`` if failed).
-    public func voteOnComment(_ token: UserCredentials?, commentID id: Int, vote: Int, completionHandler: ((Result<Comment, SwiftRantError>) -> Void)?) {
+    public func voteOnComment(_ token: UserCredentials?, commentID id: Int, vote: VoteState, completionHandler: ((Result<Comment, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
                 //fatalError("No token was specified!")
@@ -1318,7 +1318,7 @@ public class SwiftRant {
         
         request.httpMethod = "POST"
         request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        request.httpBody = "app=3&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)&vote=\(vote)".data(using: .utf8)
+        request.httpBody = "app=3&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)&vote=\(vote.rawValue)".data(using: .utf8)
         
         let session = URLSession(configuration: .default)
         
@@ -3143,7 +3143,7 @@ public class SwiftRant {
     ///    - vote: The vote state. 1 = upvote, 0 = neutral, -1 = downvote.
     ///
     /// - returns: A `Result<>` which will contain the result of the request (``Rant`` with the updated rant data if successful, ``SwiftRantError`` if failed).
-    public func voteOnRant(_ token: UserCredentials?, rantID: Int, vote: Int) async -> Result<Rant, SwiftRantError> {
+    public func voteOnRant(_ token: UserCredentials?, rantID: Int, vote: VoteState) async -> Result<Rant, SwiftRantError> {
         return await withCheckedContinuation { continuation in
             self.voteOnRant(token, rantID: rantID, vote: vote) { result in
                 continuation.resume(returning: result)
@@ -3159,7 +3159,7 @@ public class SwiftRant {
     ///    - vote: The vote state. 1 = upvote, 0 = neutral, -1 = downvote.
     ///
     /// - returns: A `Result<>` which will contain the result of the request (``Comment`` with the updated comment data if successful, ``SwiftRantError`` if failed).
-    public func voteOnComment(_ token: UserCredentials?, commentID id: Int, vote: Int) async -> Result<Comment, SwiftRantError> {
+    public func voteOnComment(_ token: UserCredentials?, commentID id: Int, vote: VoteState) async -> Result<Comment, SwiftRantError> {
         return await withCheckedContinuation { continuation in
             self.voteOnComment(token, commentID: id, vote: vote) { result in
                 continuation.resume(returning: result)
