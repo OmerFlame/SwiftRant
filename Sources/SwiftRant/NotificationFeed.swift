@@ -20,11 +20,11 @@ public struct Notifications: Decodable {
     
     /// An enumeration representing all different categories of notifications.
     public enum Categories: String, CaseIterable {
-        case all
-        case upvotes
-        case mentions
-        case comments
-        case subs
+        case all = "all"
+        case upvotes = "upvotes"
+        case mentions = "mentions"
+        case comments = "comments"
+        case subs = "subs"
     }
     
     /// A model representing the amount of all types of unread notifications.
