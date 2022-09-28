@@ -130,7 +130,8 @@ public struct Rant: Decodable, Identifiable {
         /// The user's background color, in hex.
         public let backgroundColor: String
         
-        /// If the user has built an avatar for himself, this will contain a URL of the avatar's image.
+        /// If the user has built an avatar, this will contain a jpeg image name of the avatar's image.
+        /// You can append it to `https://avatars.devrant.com/` to get a URL that you can use to fetch the image.
         public let avatarImage: String?
         
         enum CodingKeys: String, CodingKey {
