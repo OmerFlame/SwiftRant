@@ -326,7 +326,7 @@ final class SwiftRantTests: XCTestCase {
         SwiftRant.shared.logIn(username: username!, password: password!) { result in
             XCTAssertNotNil(try? result.get())
             
-            SwiftRant.shared.voteOnRant(nil, rantID: 4811624, vote: 0) { result in
+            SwiftRant.shared.voteOnRant(nil, rantID: 4811624, vote: .unvoted) { result in
                 XCTAssertNotNil(try? result.get())
                 
                 print("BREAKPOINT HERE")
@@ -363,7 +363,7 @@ final class SwiftRantTests: XCTestCase {
         SwiftRant.shared.logIn(username: username!, password: password!) { result in
             XCTAssertNotNil(try? result.get())
             
-            SwiftRant.shared.voteOnComment(nil, commentID: 4811651, vote: 0) { result in
+            SwiftRant.shared.voteOnComment(nil, commentID: 4811651, vote: .unvoted) { result in
                 XCTAssertNotNil(try? result.get())
                 
                 print("BREAKPOINT HERE")
