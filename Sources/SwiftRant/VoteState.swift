@@ -7,6 +7,7 @@
 
 import Foundation
 
+/// An enumeration representing the different types of votes a rant can have.
 public enum VoteState: Int {
     /// Represents the state of a given ++ vote.
     case upvoted = 1
