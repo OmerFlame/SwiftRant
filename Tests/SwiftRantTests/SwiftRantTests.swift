@@ -240,6 +240,26 @@ final class SwiftRantTests: XCTestCase {
         print("Print your real password: ", terminator: "")
         let password = readLine()
         
+        print("Enter a category of notifications to fetch: ")
+        print("1. all\n2. upvotes\n3. mentions\n4. comments\n5. subs\nSelection: ", terminator: "")
+        var input = readLine() ?? ""
+        
+        var categoryNumber: Int! = Int(input)
+        
+        while categoryNumber == nil || !(0...4).contains(categoryNumber - 1) {
+            print("Invalid category number entered.")
+            
+            print("Enter a category of notifications to fetch: ")
+            print("1. all\n2. upvotes\n3. mentions\n4. comments\n5. subs\nSelection: ", terminator: "")
+            
+            input = readLine() ?? ""
+            categoryNumber = Int(input)
+        }
+        
+        categoryNumber -= 1
+        
+		let category: Notifications.Categories = .allCases[categoryNumber]
+        
         SwiftRant.shared.logIn(username: username!, password: password!) { result in
             XCTAssertNotNil(try? result.get())
             
@@ -253,7 +273,7 @@ final class SwiftRantTests: XCTestCase {
                 semaphore.signal()
             }*/
             
-            SwiftRant.shared.getNotificationFeed(token: nil, lastCheckTime: nil, shouldGetNewNotifs: false, category: .all) { result in
+            SwiftRant.shared.getNotificationFeed(token: nil, lastCheckTime: nil, shouldGetNewNotifs: false, category: category) { result in
                 XCTAssertNotNil(try? result.get())
                 
                 print("BREAKPOINT")
@@ -326,7 +346,7 @@ final class SwiftRantTests: XCTestCase {
         SwiftRant.shared.logIn(username: username!, password: password!) { result in
             XCTAssertNotNil(try? result.get())
             
-            SwiftRant.shared.voteOnRant(nil, rantID: 4811624, vote: 0) { result in
+			SwiftRant.shared.voteOnRant(nil, rantID: 4811624, vote: .unvoted) { result in
                 XCTAssertNotNil(try? result.get())
                 
                 print("BREAKPOINT HERE")
@@ -363,7 +383,7 @@ final class SwiftRantTests: XCTestCase {
         SwiftRant.shared.logIn(username: username!, password: password!) { result in
             XCTAssertNotNil(try? result.get())
             
-            SwiftRant.shared.voteOnComment(nil, commentID: 4811651, vote: 0) { result in
+			SwiftRant.shared.voteOnComment(nil, commentID: 4811651, vote: .unvoted) { result in
                 XCTAssertNotNil(try? result.get())
                 
                 print("BREAKPOINT HERE")
