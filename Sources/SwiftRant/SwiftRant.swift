@@ -59,8 +59,8 @@ public class SwiftRant {
     /// Initializes the SwiftRant library.
     ///
     /// - Parameter shouldUseKeychainAndUserDefaults: Whether or not the library should store devRant access tokens and the user's personal username and password in the Keychain and small caches in User Defaults. If no value is given, Keychain and User Defaults for the instance are automatically enabled.
-    /// - Returns: a new SwiftRant class.
-    init(shouldUseKeychainAndUserDefaults: Bool = true) {
+    /// - Returns: a new SwiftRant class instance.
+    public init(shouldUseKeychainAndUserDefaults: Bool = true) {
         self.shouldUseKeychainAndUserDefaults = shouldUseKeychainAndUserDefaults
     }
     
