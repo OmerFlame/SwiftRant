@@ -622,7 +622,15 @@ public class SwiftRant {
             }
         }
         
-        let resourceURL = URL(string: baseURL + "/users/me/notif-feed\(category.rawValue)?last_time=\(shouldUseKeychainAndUserDefaults ? (shouldGetNewNotifs ? UserDefaults.standard.integer(forKey: "DRLastNotifCheckTime") : 0) : (shouldGetNewNotifs ? lastCheckTime! : 0))&ext_prof=1&app=3&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+        let categoryUrlPart: String
+        switch category {
+        case .all:
+            categoryUrlPart = ""
+        default:
+            categoryUrlPart = "/\(category.rawValue)"
+        }
+        
+        let resourceURL = URL(string: baseURL + "/users/me/notif-feed\(categoryUrlPart)?last_time=\(shouldUseKeychainAndUserDefaults ? (shouldGetNewNotifs ? UserDefaults.standard.integer(forKey: "DRLastNotifCheckTime") : 0) : (shouldGetNewNotifs ? lastCheckTime! : 0))&ext_prof=1&app=3&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
         
         var request = URLRequest(url: resourceURL)
         
