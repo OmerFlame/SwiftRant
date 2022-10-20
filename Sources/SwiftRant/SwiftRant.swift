@@ -250,12 +250,13 @@ public class SwiftRant {
     ///
     /// - Parameters:
     ///    - token: The user's token. set to `nil`if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - sort: What kind of feed.
     ///    - skip: How many rants to skip before loading. Used for pagination/infinite scroll.
     ///    - prevSet: The ``RantFeed/set`` you got in the last fetch. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults, the SwiftRant instance will get the set from the last fetch from User Defaults.
     ///    - completionHandler: The completion handler to call when the fetch is complete.
     ///
     ///         The completion handler takes in a single `result` parameter which will contain the result of the request (``RantFeed`` with the personalized rant feed if successful, ``SwiftRantError`` if failed).
-    public func getRantFeed(token: UserCredentials?, skip: Int, prevSet: String?, completionHandler: @escaping (Result<RantFeed, SwiftRantError>) -> Void) {
+    public func getRantFeed(token: UserCredentials?, sort: RantFeed.Sort = .algorithm, skip: Int, prevSet: String?, completionHandler: @escaping (Result<RantFeed, SwiftRantError>) -> Void) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
                 //fatalError("No token was specified!")
@@ -301,6 +302,25 @@ public class SwiftRant {
         
         let currentToken: UserCredentials? = self.keychainWrapper.decode(forKey: "DRToken")
         
+        let sortAndRangeUrlPart: String
+        switch sort {
+        case .algorithm:
+            sortAndRangeUrlPart = "&sort=algo"
+        case .recent:
+            sortAndRangeUrlPart = "&sort=recent"
+        case .top(range: let range):
+            switch range {
+            case .day:
+                sortAndRangeUrlPart = "&sort=top&range=day"
+            case .week:
+                sortAndRangeUrlPart = "&sort=top&range=week"
+            case .month:
+                sortAndRangeUrlPart = "&sort=top&range=month"
+            case .all:
+                sortAndRangeUrlPart = "&sort=top&range=all"
+            }
+        }
+        
         var resourceURL: URL!
         
         if shouldUseKeychainAndUserDefaults {
@@ -310,12 +330,12 @@ public class SwiftRant {
             }
             
             if UserDefaults.standard.string(forKey: "DRLastSet") != nil {
-                resourceURL = URL(string: baseURL + "/devrant/rants?limit=20&skip=\(String(skip))&sort=algo&prev_set=\(String(UserDefaults.standard.string(forKey: "DRLastSet")!))&app=3&plat=1&nari=1&user_id=\(String(currentToken.authToken.userID))&token_id=\(String(currentToken.authToken.tokenID))&token_key=\(currentToken.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+                resourceURL = URL(string: baseURL + "/devrant/rants?limit=20&skip=\(String(skip))\(sortAndRangeUrlPart)&prev_set=\(String(UserDefaults.standard.string(forKey: "DRLastSet")!))&app=3&plat=1&nari=1&user_id=\(String(currentToken.authToken.userID))&token_id=\(String(currentToken.authToken.tokenID))&token_key=\(currentToken.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
             } else {
-                resourceURL = URL(string: baseURL + "/devrant/rants?limit=20&skip=\(String(skip))&sort=algo&app=3&plat=1&nari=1&user_id=\(String(currentToken.authToken.userID))&token_id=\(String(currentToken.authToken.tokenID))&token_key=\(currentToken.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+                resourceURL = URL(string: baseURL + "/devrant/rants?limit=20&skip=\(String(skip))\(sortAndRangeUrlPart)&app=3&plat=1&nari=1&user_id=\(String(currentToken.authToken.userID))&token_id=\(String(currentToken.authToken.tokenID))&token_key=\(currentToken.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
             }
         } else {
-            resourceURL = URL(string: baseURL + "/devrant/rants?limit=20&skip=\(String(skip))&sort=algo\(prevSet != nil ? "&prev_set=\(prevSet!)" : "")&app=3&plat=1&nari=1&user_id=\(String(token!.authToken.userID))&token_id=\(String(token!.authToken.tokenID))&token_key=\(token!.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
+            resourceURL = URL(string: baseURL + "/devrant/rants?limit=20&skip=\(String(skip))\(sortAndRangeUrlPart)\(prevSet != nil ? "&prev_set=\(prevSet!)" : "")&app=3&plat=1&nari=1&user_id=\(String(token!.authToken.userID))&token_id=\(String(token!.authToken.tokenID))&token_key=\(token!.authToken.tokenKey)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)!)!
         }
         
         
@@ -2983,13 +3003,14 @@ public class SwiftRant {
     ///
     /// - Parameters:
     ///    - token: The user's token. set to `nil`if the SwiftRant instance was configured to use the Keychain and User Defaults.
+    ///    - sort: What kind of feed.
     ///    - skip: How many rants to skip before loading. Used for pagination/infinite scroll.
     ///    - prevSet: The ``RantFeed/set`` you got in the last fetch. Set to `nil` if the SwiftRant instance was configured to use the Keychain and User Defaults, the SwiftRant instance will get the set from the last fetch from User Defaults.
     ///
     /// - returns: A `Result<>` which will contain the result of the request (``RantFeed`` with the personalized rant feed if successful, ``SwiftRantError`` if failed).
-    public func getRantFeed(token: UserCredentials?, skip: Int, prevSet: String?) async -> Result<RantFeed, SwiftRantError> {
+    public func getRantFeed(token: UserCredentials?, sort: RantFeed.Sort = .algorithm, skip: Int, prevSet: String?) async -> Result<RantFeed, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.getRantFeed(token: token, skip: skip, prevSet: prevSet) { result in
+            self.getRantFeed(token: token, sort: sort, skip: skip, prevSet: prevSet) { result in
                 continuation.resume(returning: result)
             }
         }

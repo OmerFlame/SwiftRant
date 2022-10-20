@@ -172,3 +172,32 @@ public struct RantFeed: Decodable {
         news = try values.decodeIfPresent(News.self, forKey: .news)
     }
 }
+
+//MARK: - sort & range
+
+public extension RantFeed {
+    enum Sort {
+        /// The devRant algorithm decides what rants appear in the feed.
+        case algorithm
+        
+        /// The most recent rants appear in the feed.
+        case recent
+        
+        /// The top rated rants appear in the feed.
+        case top(range: Range)
+    }
+    
+    enum Range {
+        /// Rants from the one day.
+        case day
+        
+        /// Rants from the one week.
+        case week
+        
+        /// Rants from the one month.
+        case month
+        
+        /// Rants from all time.
+        case all
+    }
+}
