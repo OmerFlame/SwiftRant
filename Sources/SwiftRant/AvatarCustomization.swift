@@ -14,10 +14,24 @@ import AppKit
 #endif
 
 /// A model representing the results of the customization query from the devRant servers.
-public struct AvatarCustomizationResults: Decodable {
+public struct AvatarCustomizationResults: Decodable, Hashable {
     
     /// A class representing a customization image in the avatar editor.
-    public class AvatarCustomizationImage: Decodable {
+    public class AvatarCustomizationImage: Decodable, Hashable, Equatable {
+        //TODO: check if this class can be a struct. If yes, change it to struct and remove the explicit functions to conform to Hashable and Equatable, because they are synthesized automatically for structs.
+        
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(backgroundColor)
+            hasher.combine(fullImageName)
+            hasher.combine(midImageName)
+        }
+        
+        public static func == (lhs: AvatarCustomizationResults.AvatarCustomizationImage, rhs: AvatarCustomizationResults.AvatarCustomizationImage) -> Bool {
+            return
+                rhs.backgroundColor == lhs.backgroundColor &&
+                rhs.fullImageName == lhs.fullImageName &&
+                rhs.midImageName == lhs.midImageName
+        }
         
         /// The background color in hexadecimal.
         public let backgroundColor: String
@@ -159,14 +173,14 @@ public struct AvatarCustomizationResults: Decodable {
     }
     
     /// A model representing the current info about the user.
-    public struct AvatarCustomizationCurrentUserInfo: Decodable {
+    public struct AvatarCustomizationCurrentUserInfo: Decodable, Hashable {
         
         /// The user's current score on devRant.
         public var score: Int
     }
     
     /// A model representing an avatar customization type.
-    public struct AvatarCustomizationType: Decodable {
+    public struct AvatarCustomizationType: Decodable, Hashable {
         
         /// The gender for which the customization type is made for, if the type is gender-specific.
         public let forGender: String?
@@ -189,7 +203,7 @@ public struct AvatarCustomizationResults: Decodable {
     }
     
     /// A model representing an avatar customization option.
-    public struct AvatarCustomizationOption: Decodable {
+    public struct AvatarCustomizationOption: Decodable, Hashable {
         
         /// The background color of the option's image in hexadecimal.
         public let backgroundColor: String?

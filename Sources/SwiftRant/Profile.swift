@@ -8,10 +8,10 @@
 import Foundation
 
 /// Holds information about a single user's profile.
-public struct Profile: Decodable {
+public struct Profile: Decodable, Hashable {
     
     /// A structure that coalesces both the content itself and the amount of different types of content created by the user.
-    public struct OuterUserContent: Decodable {
+    public struct OuterUserContent: Decodable, Hashable {
         /// The user's content.
         public let content: InnerUserContent
         
@@ -25,7 +25,7 @@ public struct Profile: Decodable {
     }
     
     /// The actual content created by the user.
-    public struct InnerUserContent: Decodable {
+    public struct InnerUserContent: Decodable, Hashable {
         
         /// The rants the user created.
         public var rants: [RantInFeed]
@@ -79,7 +79,7 @@ public struct Profile: Decodable {
     }
     
     /// A structure representing the amount of content the user has created for every single type of content.
-    public struct UserCounts: Decodable {
+    public struct UserCounts: Decodable, Hashable {
         
         /// The amount of rants the user has posted.
         public let rants: Int

@@ -8,7 +8,7 @@
 import Foundation
 
 /// Holds information about a single comment.
-public struct Comment: Decodable, Identifiable {
+public struct Comment: Decodable, Identifiable, Hashable {
     var uuid = UUID()
     
     /// The comment's ID.

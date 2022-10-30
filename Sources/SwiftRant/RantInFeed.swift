@@ -8,7 +8,7 @@
 import Foundation
 
 /// Holds shortened and summarized information about a specific rant. Used when the rant is contained in a feed.
-public struct RantInFeed: Decodable, Identifiable {
+public struct RantInFeed: Decodable, Identifiable, Hashable {
     let uuid = UUID()
     
     /// The rant's ID.

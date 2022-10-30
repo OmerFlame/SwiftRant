@@ -10,10 +10,10 @@ import Foundation
 public extension Notifications {
     
     /// A wrapper for an array holding a map of the usernames and their corresponding notifications.
-    struct UsernameMapArray: Decodable {
+    struct UsernameMapArray: Decodable, Hashable {
         
         /// A model representing a map of a username and its corresponding notification.
-        public struct UsernameMap: Decodable {
+        public struct UsernameMap: Decodable, Hashable {
             
             /// The user's avatar.
             public let avatar: Rant.UserAvatar

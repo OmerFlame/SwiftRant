@@ -8,10 +8,10 @@
 import Foundation
 
 /// A struct representing a list of Weekly Rant weeks.
-public struct WeeklyList: Decodable {
+public struct WeeklyList: Decodable, Hashable {
     
     /// A struct representing the initial information for a since rant week.
-    public struct Week: Decodable {
+    public struct Week: Decodable, Hashable {
         
         /// The week number.
         public let week: Int
