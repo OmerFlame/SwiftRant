@@ -180,7 +180,7 @@ public struct AvatarCustomizationResults: Decodable, Hashable {
     }
     
     /// A model representing an avatar customization type.
-    public struct AvatarCustomizationType: Decodable, Hashable {
+    public struct AvatarCustomizationType: Decodable, Hashable, Identifiable {
         
         /// The gender for which the customization type is made for, if the type is gender-specific.
         public let forGender: String?
@@ -203,7 +203,7 @@ public struct AvatarCustomizationResults: Decodable, Hashable {
     }
     
     /// A model representing an avatar customization option.
-    public struct AvatarCustomizationOption: Decodable, Hashable {
+    public struct AvatarCustomizationOption: Decodable, Hashable, Identifiable {
         
         /// The background color of the option's image in hexadecimal.
         public let backgroundColor: String?

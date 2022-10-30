@@ -9,8 +9,6 @@ import Foundation
 
 /// Holds information about a single comment.
 public struct Comment: Decodable, Identifiable, Hashable {
-    var uuid = UUID()
-    
     /// The comment's ID.
     public let id: Int
     
@@ -75,8 +73,7 @@ public struct Comment: Decodable, Identifiable, Hashable {
              attachedImage = "attached_image"
     }
     
-    public init(uuid: UUID = UUID(), id: Int, rantID: Int, body: String, score: Int, createdTime: Int, voteState: VoteState, links: [Rant.Link]?, userID: Int, username: String, userScore: Int, userAvatar: Rant.UserAvatar, isUserDPP: Int?, attachedImage: Rant.AttachedImage?) {
-        self.uuid = uuid
+    public init(id: Int, rantID: Int, body: String, score: Int, createdTime: Int, voteState: VoteState, links: [Rant.Link]?, userID: Int, username: String, userScore: Int, userAvatar: Rant.UserAvatar, isUserDPP: Int?, attachedImage: Rant.AttachedImage?) {
         self.id = id
         self.rantID = rantID
         self.body = body

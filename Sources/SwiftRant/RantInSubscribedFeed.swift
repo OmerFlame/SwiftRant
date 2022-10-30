@@ -98,7 +98,7 @@ extension UnkeyedDecodingContainer {
 }
 
 /// A structure representing a single rant/post inside a Subscribed feed.
-public struct RantInSubscribedFeed: Decodable, Hashable {
+public struct RantInSubscribedFeed: Decodable, Hashable, Identifiable {
     
     /// A structure representing one action a specific user has performed on a post listed in a Subscribed feed.
     public struct RelatedUserAction: Decodable, Hashable {
