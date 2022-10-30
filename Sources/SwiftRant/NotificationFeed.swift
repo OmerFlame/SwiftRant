@@ -96,6 +96,7 @@ public struct Notifications: Decodable, Hashable {
 
 /// A model representing a single notification.
 public struct Notification: Decodable, Equatable, Hashable {
+    public let uuid = UUID()
     
     /// The comment's ID, if the notification is linked to a comment.
     public let commentID: Int?

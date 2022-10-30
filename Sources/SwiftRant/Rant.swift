@@ -152,6 +152,8 @@ public struct Rant: Decodable, Identifiable, Hashable {
         }
     }
     
+    public let uuid = UUID()
+    
     /// If the rant is taking part in the weekly group rant, this variable will be populated with information regarding it.
     public let weekly: Weekly?
     
