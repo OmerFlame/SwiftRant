@@ -490,10 +490,14 @@ final class SwiftRantTests: XCTestCase {
         print("Print your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+        let drAPI = SwiftRant(shouldUseKeychainAndUserDefaults: false)
+        
+        drAPI.logIn(username: username!, password: password!) { result in
             XCTAssertNotNil(try? result.get())
             
-            SwiftRant.shared.postRant(nil, postType: .undefined, content: "This is a test post", tags: nil, image: nil) { result in
+            let token = try! result.get()
+            
+            drAPI.postRant(token, postType: .undefined, content: "This is a test", tags: nil, image: nil) { result in
                 XCTAssertNotNil(try? result.get())
                 
                 semaphore.signal()
