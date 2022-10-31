@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct NotificationFeed: Decodable {
+struct NotificationFeed: Decodable, Hashable {
     public let data: Notifications
     
     public init(data: Notifications) {
@@ -16,7 +16,7 @@ struct NotificationFeed: Decodable {
 }
 
 /// A model representing the notification data.
-public struct Notifications: Decodable {
+public struct Notifications: Decodable, Hashable {
     
     /// An enumeration representing all different categories of notifications.
     public enum Categories: String, CaseIterable {
@@ -28,7 +28,7 @@ public struct Notifications: Decodable {
     }
     
     /// A model representing the amount of all types of unread notifications.
-    public struct UnreadNotifications: Decodable {
+    public struct UnreadNotifications: Decodable, Hashable {
         
         /// The total amount of unread notifications in the "all" category
         public let all: Int
@@ -95,7 +95,8 @@ public struct Notifications: Decodable {
 }
 
 /// A model representing a single notification.
-public struct Notification: Decodable, Equatable {
+public struct Notification: Decodable, Equatable, Hashable {
+    public let uuid = UUID()
     
     /// The comment's ID, if the notification is linked to a comment.
     public let commentID: Int?

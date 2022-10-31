@@ -8,10 +8,10 @@
 import Foundation
 
 /// A structure representing a user's credentials for accessing the devRant servers.
-public struct UserCredentials: Codable, Equatable {
+public struct UserCredentials: Codable, Equatable, Hashable {
     
     /// A structure representing a user's auth token.
-    public struct AuthToken: Codable {
+    public struct AuthToken: Codable, Hashable {
         /// The user's token ID.
         public let tokenID: Int
         

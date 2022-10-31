@@ -8,10 +8,10 @@
 import Foundation
 
 /// Contains the contents of a devRant rant feed.
-public struct RantFeed: Decodable {
+public struct RantFeed: Decodable, Hashable {
     
     /// Contains settings about notifications.
-    public struct Settings: Codable {
+    public struct Settings: Codable, Hashable {
         
         /// Whether notifications are available.
         public let notificationState: String
@@ -43,7 +43,7 @@ public struct RantFeed: Decodable {
     }
     
     /// Contains the amount of unread notifications.
-    public struct Unread: Decodable {
+    public struct Unread: Decodable, Hashable {
         
         /// The total count of unread notifications.
         public let total: Int
@@ -55,7 +55,7 @@ public struct RantFeed: Decodable {
     
     /// Contains information about news given in rant feeds.
     /// - note: This is mostly used for Weekly Group Rants.
-    public struct News: Decodable {
+    public struct News: Decodable, Hashable, Identifiable {
         
         /// The ID of the news.
         public let id: Int

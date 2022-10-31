@@ -8,10 +8,10 @@
 import Foundation
 
 /// Holds information about a single rant.
-public struct Rant: Decodable, Identifiable {
+public struct Rant: Decodable, Identifiable, Hashable {
     
     /// Holds information about a specific weekly group rant.
-    public struct Weekly: Decodable {
+    public struct Weekly: Decodable, Hashable {
         
         /// The date the weekly group rant was published.
         public let date: String
@@ -34,7 +34,7 @@ public struct Rant: Decodable, Identifiable {
     }
 
     /// Holds information about links inside rants and comments.
-    public struct Link: Decodable {
+    public struct Link: Decodable, Hashable {
         
         /// The type of link.
         /// The types that exist are `url` and `mention`.
@@ -105,7 +105,7 @@ public struct Rant: Decodable, Identifiable {
     }
 
     /// Holds information about attached images in rants and comments.
-    public struct AttachedImage: Decodable {
+    public struct AttachedImage: Decodable, Hashable {
         //let attached_image: String?
         
         /// The attached image's URL.
@@ -125,7 +125,7 @@ public struct Rant: Decodable, Identifiable {
     }
 
     /// Holds information about a user's avatar.
-    public struct UserAvatar: Decodable, Equatable {
+    public struct UserAvatar: Decodable, Equatable, Hashable {
         
         /// The user's background color, in hex.
         public let backgroundColor: String

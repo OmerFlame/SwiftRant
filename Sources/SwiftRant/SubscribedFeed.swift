@@ -7,10 +7,10 @@
 
 import Foundation
 
-public struct SubscribedFeed: Decodable {
+public struct SubscribedFeed: Decodable, Hashable {
     
     /// A structure representing information about the current page of the Subscribed feed.
-    public struct PageInfo: Decodable {
+    public struct PageInfo: Decodable, Hashable {
         /// A signature marking the end of the current page. Use this to get a fresh list of rants that weren't showcased in this feed.
         public let endCursor: String
         
@@ -36,7 +36,7 @@ public struct SubscribedFeed: Decodable {
     }
     
     /// A structure representing the list of users the devRant API thinks it can recommend to the user.
-    public struct RecommendedUsers: Decodable {
+    public struct RecommendedUsers: Decodable, Hashable {
         
         /// The list of the IDs of the recommended users.
         public var users: [Int]
@@ -74,7 +74,7 @@ public struct SubscribedFeed: Decodable {
     
     /// A structure representing a wrapper for an array holding a map of the users showcased and recommended in this feed.
     /// - Warning: **This struct is incompatible with** ``Notifications/UsernameMapArray``**, because of different key names between the two responses.** This is not a limitation of this library, but a screw-up on devRant's side.
-    public struct UsernameMap: Decodable {
+    public struct UsernameMap: Decodable, Hashable {
         
         /// A structure representing a single user in the username map.
         public struct User: Decodable, Hashable {
@@ -82,9 +82,12 @@ public struct SubscribedFeed: Decodable {
                 return lhs.username == rhs.username && lhs.avatar == rhs.avatar && lhs.score == rhs.score && lhs.userID == rhs.userID
             }
             
+            /* The hash function should take into account all stored properties, not just the id.
+             * Because it should be used to recognize changes in the object, not to identify the object.
             public func hash(into hasher: inout Hasher) {
                 hasher.combine(userID)
             }
+             */
             
             /// The user's username.
             public let username: String
