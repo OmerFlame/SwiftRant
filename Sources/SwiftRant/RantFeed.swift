@@ -32,7 +32,12 @@ public struct RantFeed: Decodable {
         public init(from decoder: Decoder) throws {
             let values = try decoder.container(keyedBy: CodingKeys.self)
             
-            notificationState = try values.decode(String.self, forKey: .notificationState)
+            do {
+                notificationState = try values.decode(String.self, forKey: .notificationState)
+            } catch {
+                // The notif_state can be the integer -1 instead of a string. Probably when the account's email has not been verified yet.
+                notificationState = String(try values.decode(Int.self, forKey: .notificationState))
+            }
             notificationToken = try? values.decode(String.self, forKey: .notificationToken)
         }
     }
