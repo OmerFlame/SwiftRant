@@ -193,6 +193,7 @@ final class SwiftRantTests: XCTestCase {
     }
     
     func testRantFromID() throws {
+        let dRAPI = SwiftRant(shouldUseKeychainAndUserDefaults: false)
         let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
         
         let semaphore = DispatchSemaphore(value: 0)
@@ -203,10 +204,10 @@ final class SwiftRantTests: XCTestCase {
         print("Print your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+        dRAPI.logIn(username: username!, password: password!) { result in
             XCTAssertNotNil(try? result.get())
             
-            SwiftRant.shared.getRantFromID(token: nil, id: 5055500, lastCommentID: nil) { result in
+            dRAPI.getRantFromID(token: try! result.get(), id: 4831495, lastCommentID: nil) { result in
                 XCTAssertNotNil(try? result.get())
                 
                 print("BREAKPOINT")
