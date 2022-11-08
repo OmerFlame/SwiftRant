@@ -38,6 +38,15 @@ public struct Comment: Decodable, Identifiable, Hashable {
         }
     }
     
+    public var isEditedRaw: Bool?
+    
+    /// Whether or not the comment's author has edited the comment in the past.
+    public var isEdited: Bool {
+        get {
+            return isEditedRaw ?? false
+        }
+    }
+    
     /// If the comment includes URLs in the text, those that were successfully parsed by the server will be in this array.
     public var links: [Rant.Link]?
     
@@ -73,15 +82,17 @@ public struct Comment: Decodable, Identifiable, Hashable {
              userAvatar = "user_avatar",
              isUserDPP = "user_dpp",
              attachedImage = "attached_image"
+        case isEditedRaw = "edited"
     }
     
-    public init(id: Int, rantID: Int, body: String, score: Int, createdTime: Int, voteState: VoteState, links: [Rant.Link]?, userID: Int, username: String, userScore: Int, userAvatar: Rant.UserAvatar, isUserDPP: Int?, attachedImage: Rant.AttachedImage?) {
+    public init(id: Int, rantID: Int, body: String, score: Int, createdTime: Int, voteState: VoteState, isEdited: Bool = false, links: [Rant.Link]?, userID: Int, username: String, userScore: Int, userAvatar: Rant.UserAvatar, isUserDPP: Int?, attachedImage: Rant.AttachedImage?) {
         self.id = id
         self.rantID = rantID
         self.body = body
         self.score = score
         self.createdTime = createdTime
         self.voteStateRaw = voteState.rawValue
+        self.isEditedRaw = isEdited
         self.links = links
         self.userID = userID
         self.username = username
@@ -99,7 +110,14 @@ public struct Comment: Decodable, Identifiable, Hashable {
         score = try values.decode(Int.self, forKey: .score)
         createdTime = try values.decode(Int.self, forKey: .createdTime)
         voteStateRaw = try values.decode(Int.self, forKey: .voteStateRaw)
-        links = try? values.decodeIfPresent([Rant.Link].self, forKey: .links)
+        
+        if values.contains(.isEditedRaw) {
+            isEditedRaw = try values.decodeIfPresent(Bool.self, forKey: .isEditedRaw)
+        } else {
+            isEditedRaw = false
+        }
+        
+        links = try values.decodeIfPresent([Rant.Link].self, forKey: .links)
         userID = try values.decode(Int.self, forKey: .userID)
         username = try values.decode(String.self, forKey: .username)
         userScore = try values.decode(Int.self, forKey: .userScore)
