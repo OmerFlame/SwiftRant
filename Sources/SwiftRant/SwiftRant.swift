@@ -1482,7 +1482,7 @@ public class SwiftRant {
     ///    - completionHandler: The completion handler to call when the request is complete.
     ///
     ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Int` with the ID of the rant if successful, ``SwiftRantError`` if failed).
-    public func postRant(_ token: UserCredentials?, postType: Rant.RantType, content: String, tags: String?, image: Data?, completionHandler: ((Result<Int, SwiftRantError>) -> Void)?) {
+    public func postRant(_ token: UserCredentials?, postType: Rant.RantType, content: String, tags: String?, image: Data?, imageConversion: [ImageDataConverter] = [.unsupportedToJpeg], completionHandler: ((Result<Int, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
                 //fatalError("No token was specified!")
@@ -1532,7 +1532,7 @@ public class SwiftRant {
         
         request.httpMethod = "POST"
         
-        if image != nil {
+        if let image {
             let boundary = UUID().uuidString
             
             request.addValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -1547,7 +1547,7 @@ public class SwiftRant {
                 "type": String(postType.rawValue)
             ]
             
-            request.httpBody = createBody(parameters: paramList, boundary: boundary, data: image)
+            request.httpBody = createBody(parameters: paramList, boundary: boundary, data: imageConversion.convert(image))
         } else {
             request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
             request.httpBody = ("token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&tags=\(tags ?? "")&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&type=\(postType.rawValue)&app=3".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)! + "&rant=\(content.addingPercentEncoding(withAllowedCharacters: .alphanumerics)!)").data(using: .utf8)
@@ -1837,7 +1837,7 @@ public class SwiftRant {
     ///    - completionHandler: The completion handler to call when the request is complete.
     ///
     ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
-    public func editRant(_ token: UserCredentials?, rantID: Int, postType: Rant.RantType, content: String, tags: String?, image: Data?, completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
+    public func editRant(_ token: UserCredentials?, rantID: Int, postType: Rant.RantType, content: String, tags: String?, image: Data?, imageConversion: [ImageDataConverter] = [.unsupportedToJpeg], completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
                 //fatalError("No token was specified!")
@@ -1887,7 +1887,7 @@ public class SwiftRant {
         
         request.httpMethod = "POST"
         
-        if image != nil {
+        if let image {
             let boundary = UUID().uuidString
             
             request.addValue("multipart/form-data; boundary\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -1902,7 +1902,7 @@ public class SwiftRant {
                 "type": String(postType.rawValue)
             ]
             
-            request.httpBody = createBody(parameters: paramList, boundary: boundary, data: image)
+            request.httpBody = createBody(parameters: paramList, boundary: boundary, data: imageConversion.convert(image))
         } else {
             request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
             request.httpBody = ("token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)&tags=\(tags ?? "")&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&type=\(postType.rawValue)&app=3".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)! + "&rant=\(content.addingPercentEncoding(withAllowedCharacters: .alphanumerics)!)").data(using: .utf8)
@@ -1942,7 +1942,7 @@ public class SwiftRant {
     ///    - completionHandler: The completion handler to call when the request is complete.
     ///
     ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
-    public func postComment(_ token: UserCredentials?, rantID: Int, content: String, image: Data?, completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
+    public func postComment(_ token: UserCredentials?, rantID: Int, content: String, image: Data?, imageConversion: [ImageDataConverter] = [.unsupportedToJpeg], completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
                 //fatalError("No token was specified!")
@@ -1992,7 +1992,7 @@ public class SwiftRant {
         
         request.httpMethod = "POST"
         
-        if image != nil {
+        if let image {
             let boundary = UUID().uuidString
             
             request.addValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -2005,7 +2005,7 @@ public class SwiftRant {
                 "user_id": String(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)
             ]
             
-            request.httpBody = createBody(parameters: paramList, boundary: boundary, data: image)
+            request.httpBody = createBody(parameters: paramList, boundary: boundary, data: imageConversion.convert(image))
         } else {
             request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
             
@@ -2046,7 +2046,7 @@ public class SwiftRant {
     ///    - completionHandler: The completion handler to call when the request is complete.
     ///
     ///         The completion handler takes in a single `result` parameter which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
-    public func editComment(_ token: UserCredentials?, commentID: Int, content: String, image: Data?, completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
+    public func editComment(_ token: UserCredentials?, commentID: Int, content: String, image: Data?, imageConversion: [ImageDataConverter] = [.unsupportedToJpeg], completionHandler: ((Result<Void, SwiftRantError>) -> Void)?) {
         if !shouldUseKeychainAndUserDefaults {
             guard token != nil else {
                 //fatalError("No token was specified!")
@@ -2095,7 +2095,7 @@ public class SwiftRant {
         var request = URLRequest(url: resourceURL)
         request.httpMethod = "POST"
         
-        if image != nil {
+        if let image {
             let boundary = UUID().uuidString
             
             request.addValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
@@ -2108,7 +2108,7 @@ public class SwiftRant {
                 "user_id": String(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)
             ]
             
-            request.httpBody = createBody(parameters: paramList, boundary: boundary, data: image)
+            request.httpBody = createBody(parameters: paramList, boundary: boundary, data: imageConversion.convert(image))
         } else {
             request.addValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
             request.httpBody = ("app=3&user_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.userID : token!.authToken.userID)&token_key=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenKey : token!.authToken.tokenKey)&token_id=\(shouldUseKeychainAndUserDefaults ? tokenFromKeychain!.authToken.tokenID : token!.authToken.tokenID)".addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)! + "&comment=\(content.addingPercentEncoding(withAllowedCharacters: .alphanumerics)!)").data(using: .utf8)
@@ -2799,9 +2799,9 @@ public class SwiftRant {
     ///    - image: An image to attach to the post.
     ///
     /// - returns: A `Result<>` which will contain the result of the request (`Int` with the ID of the rant if successful, ``SwiftRantError`` if failed).
-    public func postRant(_ token: UserCredentials?, postType: Rant.RantType, content: String, tags: String?, image: Data?) async -> Result<Int, SwiftRantError> {
+    public func postRant(_ token: UserCredentials?, postType: Rant.RantType, content: String, tags: String?, image: Data?, imageConversion: [ImageDataConverter] = [.unsupportedToJpeg]) async -> Result<Int, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.postRant(token, postType: postType, content: content, tags: tags, image: image) { result in
+            self.postRant(token, postType: postType, content: content, tags: tags, image: image, imageConversion: imageConversion) { result in
                 continuation.resume(returning: result)
             }
         }
@@ -2863,9 +2863,9 @@ public class SwiftRant {
     ///    - image: A new image to attach to the post.
     ///
     /// - returns: A `Result<>` which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
-    public func editRant(_ token: UserCredentials?, rantID: Int, postType: Rant.RantType, content: String, tags: String?, image: Data?) async -> Result<Void, SwiftRantError> {
+    public func editRant(_ token: UserCredentials?, rantID: Int, postType: Rant.RantType, content: String, tags: String?, image: Data?, imageConversion: [ImageDataConverter] = [.unsupportedToJpeg]) async -> Result<Void, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.editRant(token, rantID: rantID, postType: postType, content: content, tags: tags, image: image) { result in
+            self.editRant(token, rantID: rantID, postType: postType, content: content, tags: tags, image: image, imageConversion: imageConversion) { result in
                 continuation.resume(returning: result)
             }
         }
@@ -2880,9 +2880,9 @@ public class SwiftRant {
     ///    - image: An image to attach to the comment.
     ///
     /// - returns: A `Result<>` which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
-    public func postComment(_ token: UserCredentials?, rantID: Int, content: String, image: Data?) async -> Result<Void, SwiftRantError> {
+    public func postComment(_ token: UserCredentials?, rantID: Int, content: String, image: Data?, imageConversion: [ImageDataConverter] = [.unsupportedToJpeg]) async -> Result<Void, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.postComment(token, rantID: rantID, content: content, image: image) { result in
+            self.postComment(token, rantID: rantID, content: content, image: image, imageConversion: imageConversion) { result in
                 continuation.resume(returning: result)
             }
         }
@@ -2897,9 +2897,9 @@ public class SwiftRant {
     ///    - image: A new image to attach to the comment.
     ///
     /// - returns: A `Result<>` which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
-    public func editComment(_ token: UserCredentials?, commentID: Int, content: String, image: Data?) async -> Result<Void, SwiftRantError> {
+    public func editComment(_ token: UserCredentials?, commentID: Int, content: String, image: Data?, imageConversion: [ImageDataConverter] = [.unsupportedToJpeg]) async -> Result<Void, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.editComment(token, commentID: commentID, content: content, image: image) { result in
+            self.editComment(token, commentID: commentID, content: content, image: image, imageConversion: imageConversion) { result in
                 continuation.resume(returning: result)
             }
         }
@@ -3005,15 +3005,6 @@ public class SwiftRant {
         
         return body
     }
-    
-    #if os(macOS)
-    func jpegData(from image: NSImage) -> Data {
-        let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil)!
-        let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
-        let jpegData = bitmapRep.representation(using: NSBitmapImageRep.FileType.jpeg, properties: [:])!
-        return jpegData
-    }
-    #endif
 }
 
 private extension Data {
