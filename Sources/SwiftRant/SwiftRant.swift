@@ -52,6 +52,7 @@ fileprivate struct CommentResponse: Decodable {
 
 fileprivate struct ProfileResponse: Decodable {
     let profile: Profile?
+    let subscribed: Int?
 }
 
 public class SwiftRant {
@@ -1088,7 +1089,9 @@ public class SwiftRant {
                         }
                     }
                 } else {
-                    completionHandler?(.success(profileResponse!.profile!))
+                    var profile = profileResponse!.profile!
+                    profile.subscribed = profileResponse!.subscribed == 1
+                    completionHandler?(.success(profile))
                     return
                 }
                 
