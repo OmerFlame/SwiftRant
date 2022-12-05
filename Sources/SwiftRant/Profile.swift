@@ -179,6 +179,9 @@ public struct Profile: Decodable, Hashable {
     /// If the user is subscribed to devRant++, this property will be equal to `1`. If not, this property will either be `nil` or `0`.
     public let isUserDPP: Int?
     
+    /// If the logged in user is subscribed to the user of this profile, this property will be `true`.
+    public var subscribed: Bool = false
+    
     enum CodingKeys: String, CodingKey {
         case username,
              score,
@@ -194,7 +197,7 @@ public struct Profile: Decodable, Hashable {
              isUserDPP = "dpp"
     }
     
-    public init(username: String, score: Int, about: String, location: String, createdTime: Int, skills: String, github: String, website: String?, content: Profile.OuterUserContent, avatar: Rant.UserAvatar, avatarSmall: Rant.UserAvatar, isUserDPP: Int?) {
+    public init(username: String, score: Int, about: String, location: String, createdTime: Int, skills: String, github: String, website: String?, content: Profile.OuterUserContent, avatar: Rant.UserAvatar, avatarSmall: Rant.UserAvatar, isUserDPP: Int?, subscribed: Bool) {
         self.username = username
         self.score = score
         self.about = about
@@ -207,6 +210,7 @@ public struct Profile: Decodable, Hashable {
         self.avatar = avatar
         self.avatarSmall = avatarSmall
         self.isUserDPP = isUserDPP
+        self.subscribed = subscribed
     }
     
     public init(from decoder: Decoder) throws {
