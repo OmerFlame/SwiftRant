@@ -2975,7 +2975,7 @@ public class SwiftRant {
     /// - returns: A `Result<>` which will contain the result of the request (`Void` if successful, ``SwiftRantError`` if failed).
     public func unsubscribeFromUser(_ token: UserCredentials?, userID: Int) async -> Result<Void, SwiftRantError> {
         return await withCheckedContinuation { continuation in
-            self.subscribeToUser(token, userID: userID) { result in
+            self.unsubscribeFromUser(token, userID: userID) { result in
                 continuation.resume(returning: result)
             }
         }
