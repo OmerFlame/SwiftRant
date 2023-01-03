@@ -662,6 +662,8 @@ public class SwiftRant {
         
         session.dataTask(with: request) { data, response, error in
             if let data = data {
+                let date = Date()
+                
                 let decoder = JSONDecoder()
                 
                 let notificationResult = try? decoder.decode(NotificationFeed.self, from: data)
@@ -684,6 +686,8 @@ public class SwiftRant {
                     completionHandler(.failure(SwiftRantError(message: "An unknown error has occurred.")))
                     return
                 } else {
+                    UserDefaults.standard.set(date.timeIntervalSince1970, forKey: "DRLastNotifCheckTime")
+                    
                     completionHandler(.success(notificationResult!.data))
                     return
                 }
