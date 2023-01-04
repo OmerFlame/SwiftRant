@@ -311,6 +311,25 @@ public struct Rant: Decodable, Identifiable, Hashable {
         self.userAvatar = userAvatar
         self.userAvatarLarge = userAvatarLarge
         self.isUserDPP = isUserDPP
+        
+        if links != nil {
+            let stringAsData = text.data(using: .utf8)!
+            
+            var temporaryStringBytes = Data()
+            var temporaryGenericUseString = ""
+            
+            for i in 0..<(links!.count) {
+                if links![i].start == nil && links![i].end == nil {
+                    self.links![i].calculatedRange = (text as NSString).range(of: links![i].title)
+                } else {
+                    temporaryStringBytes = stringAsData[stringAsData.index(stringAsData.startIndex, offsetBy: links![i].start!)..<stringAsData.index(stringAsData.startIndex, offsetBy: links![i].end!)]
+                    
+                    temporaryGenericUseString = String(data: temporaryStringBytes, encoding: .utf8)!
+                    
+                    self.links![i].calculatedRange = (text as NSString).range(of: temporaryGenericUseString)
+                }
+            }
+        }
     }
     
     public init(from decoder: Decoder) throws {
@@ -350,20 +369,22 @@ public struct Rant: Decodable, Identifiable, Hashable {
         isUserDPP = try? values.decode(Int.self, forKey: .isUserDPP)
         
         if links != nil {
-            let stringAsData = text.data(using: .utf8)!
+            //let stringAsData = text.data(using: .utf8)!
             
-            var temporaryStringBytes = Data()
-            var temporaryGenericUseString = ""
+            //var temporaryStringBytes = Data()
+            //var temporaryGenericUseString = ""
             
             for i in 0..<(links!.count) {
                 if links![i].start == nil && links![i].end == nil {
                     links![i].calculatedRange = (text as NSString).range(of: links![i].title)
                 } else {
-                    temporaryStringBytes = stringAsData[stringAsData.index(stringAsData.startIndex, offsetBy: links![i].start!)..<stringAsData.index(stringAsData.startIndex, offsetBy: links![i].end!)]
+                    /*temporaryStringBytes = stringAsData[stringAsData.index(stringAsData.startIndex, offsetBy: links![i].start!)..<stringAsData.index(stringAsData.startIndex, offsetBy: links![i].end!)]
                     
                     temporaryGenericUseString = String(data: temporaryStringBytes, encoding: .utf8)!
                     
-                    links![i].calculatedRange = (text as NSString).range(of: temporaryGenericUseString)
+                    links![i].calculatedRange = (text as NSString).range(of: temporaryGenericUseString)*/
+                    
+                    links![i].calculatedRange = text.charRangeForByteRange(range: NSRange(location: links![i].start!, length: links![i].end! - links![i].start!))
                 }
             }
         }
