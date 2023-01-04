@@ -207,7 +207,7 @@ final class SwiftRantTests: XCTestCase {
         dRAPI.logIn(username: username!, password: password!) { result in
             XCTAssertNotNil(try? result.get())
             
-            dRAPI.getRantFromID(token: try! result.get(), id: 4831495, lastCommentID: nil) { result in
+            dRAPI.getRantFromID(token: try! result.get(), id: 6109206, lastCommentID: nil) { result in
                 XCTAssertNotNil(try? result.get())
                 
                 print("BREAKPOINT")
@@ -313,7 +313,7 @@ final class SwiftRantTests: XCTestCase {
         drAPI.logIn(username: username!, password: password!) { result in
             XCTAssertNotNil(try? result.get())
             
-            drAPI.getCommentFromID(6109454, token: try? result.get()) { result in
+            drAPI.getCommentFromID(6109441, token: try? result.get()) { result in
                 XCTAssertNotNil(try? result.get())
                 
                 print("BREAKPOINT HERE")

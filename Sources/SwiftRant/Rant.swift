@@ -101,6 +101,8 @@ public struct Rant: Decodable, Identifiable, Hashable {
             title = try values.decode(String.self, forKey: .title)
             start = try values.decodeIfPresent(Int.self, forKey: .start)
             end = try values.decodeIfPresent(Int.self, forKey: .end)
+            
+            
         }
     }
 
