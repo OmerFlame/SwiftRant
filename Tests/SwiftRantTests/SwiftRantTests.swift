@@ -207,7 +207,7 @@ final class SwiftRantTests: XCTestCase {
         dRAPI.logIn(username: username!, password: password!) { result in
             XCTAssertNotNil(try? result.get())
             
-            dRAPI.getRantFromID(token: try! result.get(), id: 4831495, lastCommentID: nil) { result in
+            dRAPI.getRantFromID(token: try! result.get(), id: 6109206, lastCommentID: nil) { result in
                 XCTAssertNotNil(try? result.get())
                 
                 print("BREAKPOINT")
@@ -298,7 +298,9 @@ final class SwiftRantTests: XCTestCase {
     }
     
     func testComment() throws {
-        let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
+        let drAPI = SwiftRant(shouldUseKeychainAndUserDefaults: false)
+        
+        //let keychainWrapper = KeychainWrapper(serviceName: "SwiftRant", accessGroup: "SwiftRantAccessGroup")
         
         let semaphore = DispatchSemaphore(value: 0)
         
@@ -308,10 +310,10 @@ final class SwiftRantTests: XCTestCase {
         print("Print your real password: ", terminator: "")
         let password = readLine()
         
-        SwiftRant.shared.logIn(username: username!, password: password!) { result in
+        drAPI.logIn(username: username!, password: password!) { result in
             XCTAssertNotNil(try? result.get())
             
-            SwiftRant.shared.getCommentFromID(4813564, token: nil) { result in
+            drAPI.getCommentFromID(6109441, token: try? result.get()) { result in
                 XCTAssertNotNil(try? result.get())
                 
                 print("BREAKPOINT HERE")
@@ -321,7 +323,7 @@ final class SwiftRantTests: XCTestCase {
         
         semaphore.wait()
         
-        let query: [String:Any] = [kSecClass as String: kSecClassGenericPassword,
+        /*let query: [String:Any] = [kSecClass as String: kSecClassGenericPassword,
                                    kSecMatchLimit as String: kSecMatchLimitOne,
                                    kSecReturnAttributes as String: true,
                                    kSecReturnData as String: true,
@@ -330,7 +332,7 @@ final class SwiftRantTests: XCTestCase {
         
         keychainWrapper.removeAllKeys()
         UserDefaults.resetStandardUserDefaults()
-        SecItemDelete(query as CFDictionary)
+        SecItemDelete(query as CFDictionary)*/
     }
     
     func testVoteOnRant() throws {

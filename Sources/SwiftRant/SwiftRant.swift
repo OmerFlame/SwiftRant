@@ -47,7 +47,18 @@ public struct SwiftRantError: SwiftRantErrorProtocol {
 }
 
 fileprivate struct CommentResponse: Decodable {
-    public let comment: Comment?
+    public var comment: Comment?
+    
+    enum CodingKeys: CodingKey {
+        case comment
+    }
+    
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.comment = try container.decodeIfPresent(Comment.self, forKey: .comment)
+        
+        comment?.precalculateLinkRanges()
+    }
 }
 
 fileprivate struct ProfileResponse: Decodable {
